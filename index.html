@@ -1,0 +1,1294 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Family Khata</title>
+<meta name="description" content="Family ledger for cash, bank, held money and events">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#EDF1EE" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0E1513" media="(prefers-color-scheme: dark)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Khata">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="format-detection" content="telephone=no">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<script src="config.js"></script>
+</body>
+</html>
+<style>
+/* Layout: one narrow column (phone first), bottom tab bar, floating Add button, bottom-sheet forms.
+   Palette: ledger-book green-grey paper, deep teal accent, green = money in, red = money out, amber = held for others, violet = events. */
+:root{
+  --bg:#EDF1EE;--surface:#FFFFFF;--soft:#E2E9E5;--ink:#15221E;--muted:#58695F;--line:#D3DCD7;
+  --accent:#0E5A55;--accent-ink:#FFFFFF;--in:#1B7A4A;--out:#B03A2A;
+  --c-own:#0E5A55;--c-held:#A06500;--c-event:#5A4A9C;--warn-bg:#FBEFD5;--warn-ink:#6B4300;
+  --font:system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0E1513;--surface:#17211E;--soft:#1F2C28;--ink:#E5EEEA;--muted:#92A49B;--line:#2B3834;
+  --accent:#5EC2B4;--accent-ink:#06201C;--in:#5FCB92;--out:#F28B79;
+  --c-own:#5EC2B4;--c-held:#E2B057;--c-event:#AB9DE8;--warn-bg:#3A2E12;--warn-ink:#F2D9A0;color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E1513;--surface:#17211E;--soft:#1F2C28;--ink:#E5EEEA;--muted:#92A49B;--line:#2B3834;
+  --accent:#5EC2B4;--accent-ink:#06201C;--in:#5FCB92;--out:#F28B79;
+  --c-own:#5EC2B4;--c-held:#E2B057;--c-event:#AB9DE8;--warn-bg:#3A2E12;--warn-ink:#F2D9A0;color-scheme:dark}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{overscroll-behavior-y:none;-webkit-text-size-adjust:100%}
+button,a,select,input,textarea{touch-action:manipulation}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-top:calc(12px + env(safe-area-inset-top,0px));padding-bottom:0}
+#app{max-width:560px;margin:0 auto;padding-bottom:150px}
+h1,h2,h3,p{margin:0}
+button,input,select,textarea{font:inherit;color:inherit}
+input,select,textarea{font-size:16px}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums;font-weight:500}
+.top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:6px 0 14px}
+.top h1{font-size:22px;font-weight:600;letter-spacing:-.01em;overflow-wrap:anywhere}
+.top .sub{color:var(--muted);font-size:13px}
+.top>div:first-child{min-width:0}
+.sync{flex:none;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 11px;font-size:12px;min-height:30px;display:flex;align-items:center;gap:6px;color:var(--muted)}
+.sync i{width:8px;height:8px;border-radius:50%;background:var(--muted);display:block}
+.sync.ok i{background:var(--in)}.sync.busy i{background:var(--c-held)}.sync.demo i{background:var(--c-event)}
+.back{background:none;border:0;padding:8px 0;color:var(--accent);font-weight:500;min-height:44px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px}
+.hero .lbl{color:var(--muted);font-size:13px}
+.hero .big{font-size:34px;font-weight:500;margin:2px 0 4px}
+.hero .small{color:var(--muted);font-size:13px;margin-bottom:12px}
+.bar{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--soft);gap:2px}
+.bar i{display:block;min-width:0}
+.legend{display:grid;gap:8px;margin-top:12px}
+.legend div{display:flex;align-items:center;gap:8px;justify-content:space-between}
+.legend .dot{width:10px;height:10px;border-radius:2px;flex:none}
+.legend .l{display:flex;align-items:center;gap:8px;min-width:0}
+h2.sec{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:20px 0 8px}
+h3.sub3{font-size:14px;font-weight:600;margin:0 0 6px}
+.linkbtn{background:none;border:0;padding:0;color:var(--accent);text-align:left;text-decoration:underline;text-underline-offset:3px;font-weight:500}
+.acct{display:grid;gap:8px}
+.acct .head{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.acct .split{display:grid;gap:3px;color:var(--muted);font-size:13px;border-top:1px dashed var(--line);padding-top:8px}
+.acct .split div{display:flex;justify-content:space-between;gap:8px}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 14px;min-height:44px;font-weight:500}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.sm{min-height:36px;padding:5px 11px;font-size:13px}
+.btn.danger{color:var(--out);border-color:var(--out)}
+.row{display:flex;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid var(--line);align-items:flex-start;cursor:pointer}
+.row:last-child{border-bottom:0}
+.row.plain{cursor:default}
+.row .t{font-weight:500;overflow-wrap:anywhere}
+.row .s{color:var(--muted);font-size:12.5px;overflow-wrap:anywhere}
+.row .r{text-align:right;flex:none}
+.row>div:first-child{min-width:0}
+.in{color:var(--in)}.out{color:var(--out)}.mv{color:var(--muted)}
+.pos{color:var(--in)}.neg{color:var(--out)}
+.grp{font-size:12px;color:var(--muted);padding:12px 0 2px;font-weight:600}
+.alert{background:var(--warn-bg);color:var(--warn-ink);border-radius:10px;padding:11px 14px;margin-bottom:8px;font-size:14px;display:flex;justify-content:space-between;gap:10px;align-items:center}
+.alert button{background:none;border:1px solid currentColor;border-radius:6px;padding:4px 10px;min-height:32px;flex:none}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 14px;min-height:36px;font-size:14px}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.chip.sm{min-height:32px;padding:3px 12px;font-size:13px;background:var(--bg)}
+.badge{display:inline-block;font-size:11px;font-weight:600;padding:1px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted);vertical-align:middle;white-space:nowrap}
+.badge.p{color:var(--c-held);border-color:var(--c-held)}
+.badge.e{color:var(--c-event);border-color:var(--c-event)}
+.badge.f{color:var(--accent);border-color:var(--accent)}
+.search{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface);margin-bottom:10px;min-height:44px}
+.fab{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(84px + env(safe-area-inset-bottom,0px));background:var(--accent);color:var(--accent-ink);border:0;border-radius:999px;padding:0 22px;height:52px;font-weight:600;box-shadow:0 4px 14px rgba(0,0,0,.28);z-index:5;display:flex;align-items:center;gap:8px}
+nav.tabs{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);display:flex;justify-content:space-around;
+  padding:6px max(8px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px));z-index:4}
+nav.tabs button{flex:1;background:none;border:0;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11.5px;color:var(--muted);min-height:48px;padding:2px}
+nav.tabs button[aria-current="page"]{color:var(--accent);font-weight:600}
+nav.tabs svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:20}
+.sheet{position:fixed;left:0;right:0;bottom:0;max-height:92%;overflow:auto;background:var(--surface);border-radius:16px 16px 0 0;z-index:21;
+  padding:16px max(16px,env(safe-area-inset-right,0px)) calc(20px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));
+  max-width:560px;margin:0 auto}
+.sheet h3{font-size:17px;margin-bottom:12px}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px}
+.seg button{border:1px solid var(--line);background:var(--bg);border-radius:8px;min-height:44px;font-size:13.5px;font-weight:500;padding:4px 2px}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.fld{display:block;margin-bottom:10px}
+.fld>span{display:block;font-size:12.5px;color:var(--muted);margin-bottom:3px}
+.fld input,.fld select,.fld textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);min-height:44px}
+.fld textarea{min-height:70px}
+.fld .amt{font-size:26px;font-family:var(--mono);padding:10px 12px}
+.chk{display:flex;gap:10px;align-items:center;margin:4px 0 8px;min-height:44px}
+.chk input{width:22px;height:22px;flex:none}
+.two2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.newbox{margin-top:6px;padding:10px;border:1px dashed var(--accent);border-radius:8px}
+.err{color:var(--out);font-size:14px;margin:4px 0 10px;background:var(--bg);border:1px solid var(--out);border-radius:8px;padding:9px 12px}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.actions .btn{flex:1}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(150px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:8px;z-index:30;font-size:14px;max-width:90%}
+.empty{color:var(--muted);padding:6px 0}
+.kv{display:flex;justify-content:space-between;gap:10px;padding:5px 0;align-items:baseline}
+.kv.tot{border-top:1px solid var(--line);margin-top:4px;padding-top:9px;font-weight:600}
+.sample{background:var(--soft);border-radius:10px;padding:11px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:14px}
+textarea.code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;min-height:90px}
+.help{color:var(--muted);font-size:13.5px}
+.help b{color:var(--ink)}
+ol.steps,ul.steps{margin:6px 0 0;padding-left:20px;display:grid;gap:6px}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:right;font-weight:600;padding:4px 6px}
+.tbl th:first-child,.tbl td:first-child{text-align:left}
+.tbl td{padding:9px 6px;text-align:right;border-top:1px solid var(--line)}
+.tbl tr.tt td{font-weight:600}
+.tscroll{overflow-x:auto}
+.ctx{background:var(--surface);border:1px solid var(--line);border-radius:10px;margin-bottom:12px;overflow:hidden}
+.ctx .hd{padding:12px 14px 10px;display:flex;justify-content:space-between;gap:10px;align-items:flex-start;cursor:pointer}
+.ctx .hd .t{font-weight:600;overflow-wrap:anywhere}
+.ctx .hd .s{font-size:12.5px;color:var(--muted)}
+.ctx .mini{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--bg)}
+.ctx .mini div{padding:8px 6px;text-align:center;min-width:0}
+.ctx .mini .k{font-size:11px;color:var(--muted)}
+.ctx .mini .v{font-size:13px}
+.ctx .rows{padding:0 14px}
+@media (prefers-reduced-motion:no-preference){.sheet{animation:up .18s ease-out}@keyframes up{from{transform:translateY(24px);opacity:.6}}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="layer"></div>
+<script>
+/* ---------- helpers ---------- */
+var MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+var ETYPES=['Engagement','Marriage','Child birth','Birthday','Other'];
+function $(s,r){return (r||document).querySelector(s)}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function uid(){return Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-3)}
+function P(x){return Math.round((parseFloat(x)||0)*100)}
+function fmt(p){var neg=p<0;p=Math.abs(p);var s=(p/100).toLocaleString('en-IN',{minimumFractionDigits:p%100?2:0,maximumFractionDigits:2});return (neg?'−':'')+'₹'+s}
+function pad(n){return String(n).padStart(2,'0')}
+function isoOf(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())}
+function today(){return isoOf(new Date())}
+function daysAgo(n){var d=new Date();d.setDate(d.getDate()-n);return isoOf(d)}
+function fdate(iso){var a=(iso||'').split('-');return a.length<3?'':(+a[2])+' '+MON[a[1]-1]+' '+a[0]}
+function norm(s){return (s||'').trim().toLowerCase()}
+function poss(n){return n+"'s"}
+function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
+function lsSet(k,v){try{localStorage.setItem(k,v);return true}catch(e){return false}}
+
+/* ---------- state ---------- */
+var KEY='familyKhata.v2',KEY1='familyKhata.v1',COLS=['accounts','funds','people','entries','items'];
+var S,storageOK=true;
+var mode='local',DB=null,remote={},got={},fresh={},syncState='off',seedChecked=false,offerUpload=false,demo=false,wq={};
+function blank(){return {v:2,accounts:[{id:'cash',name:'Cash',kind:'cash',ord:0},{id:'bank',name:'Bank account',kind:'bank',ord:1}],
+  funds:[{id:'own',name:'My own money',kind:'own',ord:0}],people:[],entries:[],items:[]}}
+/* an older version had a separate "lent" type; lending is now just money paid out */
+function normEntries(arr){return (arr||[]).map(function(e){if(e.type==='adv'){e=Object.assign({},e);e.type='out'}return e})}
+function upgrade(j){
+  j.v=2;j.people=j.people||[];j.entries=normEntries(j.entries);j.items=j.items||[];
+  j.accounts.forEach(function(a,i){if(a.ord==null)a.ord=i});
+  j.funds.forEach(function(f,i){if(f.ord==null)f.ord=i;if(f.kind==='event'){f.member=f.member||'';f.etype=f.etype||'Other';f.date=f.date||''}});
+  return j;
+}
+function loadLocal(){
+  try{var r=lsGet(KEY)||lsGet(KEY1);if(r){var j=JSON.parse(r);if(j&&(j.v===1||j.v===2)&&j.accounts&&j.funds)return upgrade(j)}}catch(e){}
+  return blank();
+}
+function saveLocal(){storageOK=lsSet(KEY,JSON.stringify(S))}
+function localHasData(){var j=loadLocal();return j.entries.length>0||j.items.length>0||j.funds.length>1||j.people.length>0}
+function byOrd(a,b){return (a.ord==null?1e15:a.ord)-(b.ord==null?1e15:b.ord)||(a.name<b.name?-1:1)}
+function applyRemote(){
+  var n=blank();
+  COLS.forEach(function(c){if(remote[c]&&remote[c].length)n[c]=remote[c].map(function(x){return Object.assign({},x)})});
+  if(!(remote.entries&&remote.entries.length))n.entries=[];if(!(remote.items&&remote.items.length))n.items=[];if(!(remote.people&&remote.people.length))n.people=[];
+  n.entries=normEntries(n.entries);
+  n.accounts.sort(byOrd);n.funds.sort(byOrd);n.people.sort(function(a,b){return a.name<b.name?-1:1});
+  S=n;
+}
+function fundById(id){return S.funds.filter(function(f){return f.id===id})[0]}
+function accById(id){return S.accounts.filter(function(a){return a.id===id})[0]}
+function fname(id){var f=fundById(id);return f?f.name:'(removed)'}
+function aname(id){var a=accById(id);return a?a.name:'(removed)'}
+
+/* ---------- storing records (this phone, or the shared database) ---------- */
+function dbWrite(path,fn){
+  var p=(wq[path]||Promise.resolve()).then(fn).catch(function(err){
+    var c=err&&err.code;toast(c==='quota_exceeded'?'The shared storage is full.':c==='invalid_argument'?'Could not save. This account may have view-only access.':'Could not save. Check the connection.');
+    if(mode==='sync'&&!demo){applyRemote();render()}
+  });
+  wq[path]=p;return p;
+}
+function put(col,rec){
+  var arr=S[col],i=-1;arr.forEach(function(x,k){if(x.id===rec.id)i=k});if(i>=0)arr[i]=rec;else arr.push(rec);
+  if(demo)return;
+  if(mode==='sync')dbWrite(col+'/'+rec.id,function(){return DB.collection(col).doc(rec.id).set(rec)});else saveLocal();
+}
+function del(col,id){
+  S[col]=S[col].filter(function(x){return x.id!==id});
+  if(demo)return;
+  if(mode==='sync')dbWrite(col+'/'+id,function(){return DB.collection(col).doc(id).delete()});else saveLocal();
+}
+/* ---------- sync (your own Firebase project; the app also works fully without it) ---------- */
+var FB_FILES=['vendor/firebase-app-compat.js','vendor/firebase-auth-compat.js','vendor/firebase-firestore-compat.js'];
+var fbCfg=null,fbUser=null,fbAuthUnsub=null,subUnsubs=[],fbLoading=null,deferredPrompt=null;
+var SY={cfg:'',email:'',pw:'',err:'',busy:false};
+function getCfg(){
+  try{if(window.KHATA_FIREBASE&&window.KHATA_FIREBASE.apiKey)return window.KHATA_FIREBASE}catch(e){}
+  try{var r=lsGet('khata.fbcfg');if(r){var j=JSON.parse(r);if(j&&j.apiKey&&j.projectId)return j}}catch(e){}
+  return null;
+}
+function parseCfg(txt){
+  txt=(txt||'').trim();
+  if(txt.indexOf('KHATA1:')===0){try{var o=JSON.parse(decodeURIComponent(escape(atob(txt.slice(7)))));if(o&&o.c&&o.c.apiKey)return {cfg:o.c,email:o.e||''}}catch(e){}return null}
+  var cfg={};
+  ['apiKey','authDomain','projectId','storageBucket','messagingSenderId','appId'].forEach(function(k){
+    var m=new RegExp('[\'"]?'+k+'[\'"]?\\s*:\\s*[\'"]([^\'"]+)[\'"]').exec(txt);if(m)cfg[k]=m[1]});
+  if(!cfg.apiKey||!cfg.projectId||!cfg.appId)return null;
+  if(!cfg.authDomain)cfg.authDomain=cfg.projectId+'.firebaseapp.com';
+  return {cfg:cfg,email:''};
+}
+function setupText(){return 'KHATA1:'+btoa(unescape(encodeURIComponent(JSON.stringify({c:getCfg(),e:lsGet('khata.email')||''}))))}
+function loadFirebase(){
+  if(window.firebase&&firebase.firestore&&firebase.auth)return Promise.resolve();
+  if(fbLoading)return fbLoading;
+  fbLoading=FB_FILES.reduce(function(p,src){return p.then(function(){return new Promise(function(res,rej){
+    var s=document.createElement('script');s.src=src;s.onload=res;s.onerror=function(){rej(new Error('load '+src))};document.head.appendChild(s)})})},Promise.resolve());
+  return fbLoading;
+}
+async function startSync(){
+  fbCfg=getCfg();
+  if(!fbCfg){syncState='off';render();return}
+  syncState='loading';
+  try{await loadFirebase()}catch(e){fbLoading=null;syncState='error';SY.err='Could not load the sync files. Check the internet connection and reopen the app.';render();return}
+  try{
+    if(!firebase.apps.length){firebase.initializeApp(fbCfg);try{firebase.firestore().enablePersistence({synchronizeTabs:true}).catch(function(){})}catch(e){}}
+  }catch(e){syncState='error';SY.err='The sync settings look wrong. Check them in More.';render();return}
+  if(fbAuthUnsub)return;
+  fbAuthUnsub=firebase.auth().onAuthStateChanged(function(u){fbUser=u;if(u)attach(u);else{detach();syncState='signedout';render()}});
+}
+function attach(u){
+  detach();
+  var base=firebase.firestore().collection('families').doc(u.uid);
+  DB={collection:function(c){var ref=base.collection(c);return {
+    doc:function(id){var d=ref.doc(id);return {set:function(r){return d.set(JSON.parse(JSON.stringify(r)))},delete:function(){return d.delete()}}},
+    onSnapshot:function(a,b){return ref.onSnapshot({includeMetadataChanges:true},a,b)}}}};
+  mode='sync';syncState='loading';remote={};got={};fresh={};seedChecked=false;
+  setTimeout(function(){if(mode==='sync'&&!allGot()){syncState='slow';render()}},10000);
+  COLS.forEach(function(c){
+    subUnsubs.push(DB.collection(c).onSnapshot(function(snap){
+      remote[c]=snap.docs.map(function(x){return Object.assign({},x.data())});
+      got[c]=true;if(!snap.metadata.fromCache)fresh[c]=true;onRemote();
+    },function(err){syncState=allGot()?'busy':'slow';if(err&&err.code==='permission-denied')SY.err='Sync was refused. Check the Firestore rules in the setup guide.';render()}));
+  });
+  render();
+}
+function detach(){subUnsubs.forEach(function(f){try{f()}catch(e){}});subUnsubs=[];DB=null;if(mode==='sync'){mode='local';S=loadLocal()}}
+function authMsg(e){
+  var c=e&&e.code||'';
+  return ({'auth/invalid-credential':'The email or password is not right.','auth/wrong-password':'The email or password is not right.',
+    'auth/user-not-found':'No account with that email. Use Create account on the first phone.','auth/invalid-email':'That email address is not valid.',
+    'auth/email-already-in-use':'That email already has an account. Use Sign in.','auth/weak-password':'Use a password of at least 6 characters.',
+    'auth/network-request-failed':'No internet connection.','auth/operation-not-allowed':'Email sign-in is not turned on in Firebase. See the setup guide.',
+    'auth/too-many-requests':'Too many tries. Wait a few minutes.'})[c]||'Could not sign in ('+(c||'error')+').';
+}
+async function doSignIn(create){
+  var email=(SY.email||lsGet('khata.email')||'').trim(),pw=SY.pw||'';
+  if(!email||!pw){SY.err='Enter the email and password.';return render()}
+  SY.busy=true;SY.err='';render();
+  try{
+    if(create)await firebase.auth().createUserWithEmailAndPassword(email,pw);else await firebase.auth().signInWithEmailAndPassword(email,pw);
+    lsSet('khata.email',email);SY.pw='';
+  }catch(e){SY.err=authMsg(e)}
+  SY.busy=false;render();
+}
+function saveCfg(){
+  var p=parseCfg(SY.cfg);
+  if(!p){SY.err='That does not look like the Firebase settings. Copy the whole block from the Firebase console, or the setup text from your other phone.';return render()}
+  lsSet('khata.fbcfg',JSON.stringify(p.cfg));if(p.email)lsSet('khata.email',p.email);
+  location.reload();
+}
+function allGot(){return COLS.every(function(c){return got[c]})}
+function allFresh(){return COLS.every(function(c){return fresh[c]})}
+function onRemote(){
+  if(allFresh()){
+    syncState='ok';
+    if(!seedChecked){seedChecked=true;
+      var total=0;COLS.forEach(function(c){total+=(remote[c]||[]).length});
+      if(localHasData()&&lsGet('khata.migrated')!=='1')offerUpload=true;
+      else if(total===0)seedDefaults();}
+  }
+  if(!demo&&allGot()){applyRemote();render()}
+}
+function seedDefaults(){
+  var b=blank();b.accounts.forEach(function(a){DB.collection('accounts').doc(a.id).set(a).catch(function(){})});
+  b.funds.forEach(function(f){DB.collection('funds').doc(f.id).set(f).catch(function(){})});
+}
+async function runJobs(jobs,label){
+  var done=0,total=jobs.length,failed=false,i=0;
+  function prog(){$('#layer').innerHTML='<div class="scrim"></div><div class="sheet" role="status"><h3>'+esc(label)+'</h3><p class="help">Saving '+done+' of '+total+'. Keep this page open.</p></div>'}
+  prog();
+  async function worker(){
+    while(!failed&&i<jobs.length){var j=jobs[i++];
+      for(var t=0;t<2;t++){try{var ref=DB.collection(j[0]).doc(j[1].id);if(j[2])await ref.delete();else await ref.set(j[1]);break}catch(e){if(t===1){failed=true}else await new Promise(function(r){setTimeout(r,500)})}}
+      done++;if(done%10===0)prog();}
+  }
+  await Promise.all([worker(),worker(),worker(),worker()]);
+  closeSheet();return !failed;
+}
+async function replaceAll(ns,label){
+  ns=upgrade(ns);
+  if(demo)return;
+  if(mode!=='sync'){S=ns;saveLocal();hist=[];view='home';render();return}
+  var jobs=[];
+  COLS.forEach(function(c){var keep={};ns[c].forEach(function(r){keep[r.id]=1;jobs.push([c,r,false])});
+    (remote[c]||[]).forEach(function(r){if(!keep[r.id])jobs.push([c,r,true])})});
+  var ok=await runJobs(jobs,label);
+  if(!ok){toast('Stopped part way. Open More and try again.');return}
+  if(!ns.accounts.length||!ns.funds.length)seedDefaults();
+  hist=[];view='home';render();toast('Done');
+}
+/* add this phone's own records to the synced ones; never overwrites a record that is already there */
+async function mergeUpload(){
+  if(mode!=='sync')return;
+  var ls=loadLocal(),jobs=[];
+  COLS.forEach(function(c){var have={};(remote[c]||[]).forEach(function(r){have[r.id]=1});ls[c].forEach(function(r){if(!have[r.id])jobs.push([c,r,false])})});
+  lsSet('khata.migrated','1');offerUpload=false;
+  if(!jobs.length){render();toast('Everything is already synced');return}
+  var ok=await runJobs(jobs,'Uploading this phone’s records');
+  render();toast(ok?'Uploaded':'Stopped part way. Try again from More.');
+}
+function dismissUpload(){
+  lsSet('khata.migrated','1');offerUpload=false;
+  var total=0;COLS.forEach(function(c){total+=(remote[c]||[]).length});if(total===0&&DB)seedDefaults();render();
+}
+
+/* ---------- the arithmetic ----------
+   Every fund's balance is the money actually in hand for it (in cash and bank).
+   Received adds. Paid out subtracts. Returned adds back, but is not new money:
+   it reduces what that person got. Money lent out is simply paid out. */
+function compute(ents){
+  ents=ents||S.entries;
+  var acc={},hand={},cell={};
+  S.accounts.forEach(function(a){acc[a.id]=0});S.funds.forEach(function(f){hand[f.id]=0});
+  function add(a,f,p){acc[a]=(acc[a]||0)+p;hand[f]=(hand[f]||0)+p;var k=a+'|'+f;cell[k]=(cell[k]||0)+p}
+  ents.forEach(function(e){var p=P(e.amt),t=e.type;
+    if(t==='in'||t==='ret')add(e.acc,e.fund,p);
+    else if(t==='out')add(e.acc,e.fund,-p);
+    else{add(e.acc,e.fund,-p);add(e.toAcc,e.toFund,p)}});
+  return {acc:acc,fund:hand,held:hand,cell:cell};
+}
+function sumKind(C,kind){var t=0;S.funds.forEach(function(f){if(f.kind===kind)t+=(C.held[f.id]||0)});return t}
+function totalOf(C){var t=0;S.accounts.forEach(function(a){t+=C.acc[a.id]||0});return t}
+function effPerson(e){
+  if(e.type==='move')return '';
+  if(e.person&&e.person.trim())return e.person.trim();
+  if(e.type==='in'){var f=fundById(e.fund);if(f&&f.kind==='person')return f.name}
+  return '';
+}
+function srcOf(e,f){
+  if(f&&f.kind==='person'&&(!e.person||norm(e.person)===norm(f.name)))return {label:poss(f.name)+' own money',name:f.name};
+  var n=(e.person&&e.person.trim())||'';return {label:n||'(no name)',name:n};
+}
+function pairGroups(ents){
+  var g={};
+  ents.forEach(function(e){if(e.type!=='out'&&e.type!=='ret')return;var nm=effPerson(e),k=e.fund+'|'+norm(nm);
+    if(!g[k])g[k]={fund:e.fund,name:nm,out:0,ret:0};
+    if(e.type==='out')g[k].out+=P(e.amt);else g[k].ret+=P(e.amt)});
+  return g;
+}
+/* returns a plain-words reason when a change would break the books, else '' */
+function validate(ne){
+  var gb=pairGroups(S.entries),ga=pairGroups(ne),k;
+  for(k in ga){var a=ga[k],b=gb[k]||{out:0,ret:0},over=a.ret-a.out;
+    if(over>0&&over>Math.max(0,b.ret-b.out)){
+      var who=a.name||'That person';
+      return a.out===0?'Nothing was paid to '+who+' from '+fname(a.fund)+', so nothing can come back from them.':who+' got '+fmt(a.out)+' from '+fname(a.fund)+'. Returns would total '+fmt(a.ret)+', which is '+fmt(over)+' too much.'}}
+  var B=compute(),A=compute(ne),id;
+  for(id in A.acc){if(A.acc[id]<0&&A.acc[id]<(B.acc[id]||0))return aname(id)+' has only '+fmt(Math.max(0,B.acc[id]||0))+'. This would take it below zero. Choose another account, or record the money coming in first.'}
+  for(id in A.fund){if(A.fund[id]<0&&A.fund[id]<(B.fund[id]||0))return fname(id)+' has only '+fmt(Math.max(0,B.fund[id]||0))+' with you. This would take it below zero. Record the money coming in first.'}
+  for(k in A.cell){if(A.cell[k]<0&&A.cell[k]<(B.cell[k]||0)){
+    var pr=k.split('|'),where=S.accounts.filter(function(x){return (A.cell[x.id+'|'+pr[1]]||0)>0}).map(function(x){return fmt(A.cell[x.id+'|'+pr[1]])+' in '+x.name}).join(' and ');
+    return fname(pr[1])+' has only '+fmt(Math.max(0,B.cell[k]||0))+' in '+aname(pr[0])+(where?' ('+where+' right now)':'')+'. Pay from the account that holds it, or use Move to shift it first.'}}
+  return '';
+}
+function lines(fid){
+  var out=[];
+  S.entries.forEach(function(e){var p=P(e.amt),t=e.type;
+    if(e.fund===fid){
+      if(t==='in'||t==='ret')out.push({e:e,d:p});else if(t==='out')out.push({e:e,d:-p});else if(t==='move')out.push({e:e,d:-p,mv:'out'})}
+    if(t==='move'&&e.toFund===fid)out.push({e:e,d:p,mv:'in'})});
+  out.sort(function(a,b){return a.e.date<b.e.date?-1:a.e.date>b.e.date?1:(a.e.createdAt||0)-(b.e.createdAt||0)});
+  var run=0;out.forEach(function(l){run+=l.d;l.run=run});return out;
+}
+function fundSummary(fid){
+  var f=fundById(fid),L=lines(fid),src={},so=[],paid=0,back=0,mvout=0,added=0,per={},po=[];
+  function addSrc(label,name,p){if(!src[label]){src[label]={label:label,name:name,amt:0};so.push(label)}src[label].amt+=p;added+=p}
+  L.forEach(function(l){var e=l.e,t=e.type,p=Math.abs(l.d);
+    if(t==='move'){if(e.fund===e.toFund)return;if(l.mv==='in')addSrc('Moved in from '+fname(e.fund),'',p);else mvout+=p;return}
+    var who=effPerson(e)||'(no name)',k=norm(who);
+    if(!per[k]){per[k]={name:who,gave:0,got:0,back:0};po.push(k)}
+    if(t==='in'){var s=srcOf(e,f);addSrc(s.label,s.name,p);per[k].gave+=p}
+    else if(t==='out'){paid+=p;per[k].got+=p}else{back+=p;per[k].back+=p}
+  });
+  var who=po.map(function(k){return per[k]}).filter(function(x){return x.got>0||x.back>0}).sort(function(a,b){return (b.got-b.back)-(a.got-a.back)});
+  return {src:so.map(function(k){return src[k]}),added:added,paid:paid,back:back,mvout:mvout,who:who,per:po.map(function(k){return per[k]})};
+}
+
+/* ---------- people ---------- */
+function personRec(name){var k=norm(name);return S.people.filter(function(p){return norm(p.name)===k})[0]||null}
+function ensurePerson(name,family){
+  name=(name||'').trim();if(!name)return;var r=personRec(name);
+  if(!r)put('people',{id:uid(),name:name,rel:'',family:!!family});
+  else if(family&&!r.family){r.family=true;put('people',r)}
+}
+function isFamily(name){
+  var k=norm(name),r=personRec(name);if(r)return !!r.family;
+  return S.funds.some(function(f){return (f.kind==='person'&&norm(f.name)===k)||(f.kind==='event'&&norm(f.member)===k)});
+}
+function hasActivity(name){var k=norm(name);
+  return S.entries.some(function(e){return norm(e.person)===k})||S.items.some(function(i){return norm(i.person)===k})||S.funds.some(function(f){return (f.kind==='person'&&norm(f.name)===k)||(f.kind==='event'&&norm(f.member)===k)})}
+function allPeople(){var m={};
+  function put_(n){n=(n||'').trim();if(n&&!m[norm(n)])m[norm(n)]=n}
+  S.people.forEach(function(p){if(p.family||hasActivity(p.name))put_(p.name)});
+  S.funds.forEach(function(f){if(f.kind==='person')put_(f.name);if(f.kind==='event')put_(f.member)});
+  S.entries.forEach(function(e){put_(e.person)});S.items.forEach(function(i){put_(i.person)});
+  return Object.keys(m).map(function(k){return m[k]}).sort(function(a,b){return a.toLowerCase()<b.toLowerCase()?-1:1});
+}
+function personFund(name){var k=norm(name),r=null;S.funds.forEach(function(f){if(f.kind==='person'&&norm(f.name)===k)r=f});return r}
+function eventsOf(name){var k=norm(name);return S.funds.filter(function(f){return f.kind==='event'&&norm(f.member)===k}).sort(function(a,b){return (b.date||'')<(a.date||'')?-1:1})}
+function ctxOrder(f){return !f?9:f.kind==='own'?0:f.kind==='person'?1:2}
+function personCtx(name){
+  var k=norm(name),ctx={},tot={gave:0,got:0,back:0};
+  function get(fid){return ctx[fid]||(ctx[fid]={fid:fid,gave:0,got:0,back:0,rows:[]})}
+  S.entries.forEach(function(e){
+    if(e.type==='move'||norm(effPerson(e))!==k)return;
+    var c=get(e.fund),p=P(e.amt);
+    if(e.type==='in'){c.gave+=p;tot.gave+=p}else if(e.type==='out'){c.got+=p;tot.got+=p}else{c.back+=p;tot.back+=p}
+    c.rows.push({k:'m',o:e})});
+  S.items.forEach(function(i){if(norm(i.person)!==k)return;get(i.fund||'_').rows.push({k:'i',o:i})});
+  var list=Object.keys(ctx).map(function(id){return ctx[id]});
+  list.forEach(function(c){c.rows.sort(function(a,b){return a.o.date<b.o.date?1:a.o.date>b.o.date?-1:0})});
+  list.sort(function(a,b){var fa=fundById(a.fid),fb=fundById(b.fid);return ctxOrder(fa)-ctxOrder(fb)||((fb&&fb.date||'')<(fa&&fa.date||'')?-1:1)});
+  return {ctx:list,tot:tot};
+}
+function suggestNames(fid){
+  var out=[],seen={};
+  function add(n){n=(n||'').trim();if(n&&!seen[norm(n)]&&out.length<6){seen[norm(n)]=1;out.push(n)}}
+  var f=fundById(fid);if(f){if(f.kind==='person')add(f.name);if(f.kind==='event')add(f.member)}
+  S.entries.filter(function(e){return e.fund===fid&&e.type!=='move'}).sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0)}).forEach(function(e){add(e.person)});
+  return out;
+}
+
+/* ---------- navigation ---------- */
+var view='home',arg=null,hist=[],flt='all',Q='',F=null,acctAll=false;
+function go(v,a){hist.push({view:view,arg:arg});if(hist.length>40)hist.shift();view=v;arg=a||null;acctAll=false;render();window.scrollTo(0,0)}
+function tab(v){hist=[];view=v;arg=null;acctAll=false;render();window.scrollTo(0,0)}
+function back(){var p=hist.pop();if(p){view=p.view;arg=p.arg}else{view='home';arg=null}render();window.scrollTo(0,0)}
+function backBtn(){return '<button class="back" data-act="back">← Back</button>'}
+function render(){
+  var y=window.scrollY;
+  if(mode==='sync'&&!demo&&!allGot()){$('#app').innerHTML=vLoading();return}
+  var C=compute(),h='';
+  if(view==='home')h=vHome(C);else if(view==='family')h=vFamily(C);else if(view==='member')h=vMember(C,arg);
+  else if(view==='events')h=vEvents(C);else if(view==='fund')h=vFund(C,arg);else if(view==='fperson')h=vFperson(C,arg.fid,arg.name);
+  else if(view==='entries')h=vEntries();else if(view==='person')h=vPerson(C,arg);
+  else if(view==='acct')h=vAcct(C,arg);else h=vMore(C);
+  var fab='';
+  if(view==='fund')fab=' data-fund="'+esc(arg)+'"';else if(view==='fperson')fab=' data-fund="'+esc(arg.fid)+'" data-person="'+esc(arg.name)+'"';
+  $('#app').innerHTML=h+tabs()+'<button class="fab" data-act="add"'+fab+' aria-label="Add an entry"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M9 2v14M2 9h14"/></svg>Add</button>';
+  if(view==='entries')listEntries();
+  window.scrollTo(0,y);
+}
+function vLoading(){
+  return header('Family Khata','Connecting to shared records')+'<section class="card"><p class="help">Loading records…</p>'
+   +(syncState==='slow'?'<p class="help" style="margin-top:8px"><b>This is taking a while.</b> Check the internet connection. Records appear as soon as it connects.</p>':'')+'</section>';
+}
+function tabOf(){
+  if(view==='home'||view==='acct')return 'home';
+  if(view==='family'||view==='member'||view==='person')return 'family';
+  if(view==='events')return 'events';
+  if(view==='fund'||view==='fperson'){var f=fundById(view==='fund'?arg:arg.fid);return f&&f.kind==='event'?'events':'family'}
+  return view;
+}
+function tabs(){
+  var cur=tabOf();
+  var T=[['home','Home','<path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>'],
+    ['family','Family','<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/>'],
+    ['events','Events','<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'],
+    ['entries','Entries','<path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/>'],
+    ['more','More','<circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/>']];
+  return '<nav class="tabs" aria-label="Main">'+T.map(function(t){return '<button data-act="tab" data-v="'+t[0]+'"'+(cur===t[0]?' aria-current="page"':'')+'><svg viewBox="0 0 24 24" aria-hidden="true">'+t[2]+'</svg>'+t[1]+'</button>'}).join('')+'</nav>';
+}
+function syncChip(){
+  var c='',l;
+  if(demo){c='demo';l='Example'}
+  else if(mode==='sync'){if(navigator.onLine===false){c='busy';l='Offline'}else if(syncState==='ok'){c='ok';l='Synced'}else{c='busy';l='Syncing'}}
+  else if(getCfg()&&!fbUser&&syncState!=='loading'&&syncState!=='off')l='Not signed in';
+  else l='This phone only';
+  return '<button class="sync '+c+'" data-act="tab" data-v="more" aria-label="Storage: '+l+'"><i></i>'+l+'</button>';
+}
+function header(title,sub){return '<div class="top"><div><h1>'+esc(title)+'</h1>'+(sub?'<p class="sub">'+esc(sub)+'</p>':'')+'</div>'+syncChip()+'</div>'}
+function amtCls(p){return p<0?'neg':''}
+
+/* ---------- row renderers ---------- */
+var VERB={in:'From ',out:'To ',ret:'Returned by '};
+function recent(n){return merged().slice(0,n)}
+function merged(){
+  var a=S.entries.map(function(e){return {k:'m',o:e}}).concat(S.items.map(function(i){return {k:'i',o:i}}));
+  a.sort(function(x,y){return x.o.date<y.o.date?1:x.o.date>y.o.date?-1:(y.o.createdAt||0)-(x.o.createdAt||0)});return a;
+}
+function rowAny(r){return r.k==='m'?rowM(r.o):rowI(r.o)}
+function rowM(e){
+  var t=e.type,p=effPerson(e),title,sub,amt,cls;
+  if(t==='move'){title=e.note||'Moved';sub=fdate(e.date)+' · '+esc(aname(e.acc))+' / '+esc(fname(e.fund))+' → '+esc(aname(e.toAcc))+' / '+esc(fname(e.toFund));amt=fmt(P(e.amt));cls='mv'}
+  else{title=VERB[t]+(p||'(no name)');sub=fdate(e.date)+' · '+esc(aname(e.acc))+' · '+esc(fname(e.fund))+(e.note?' · '+esc(e.note):'');
+    amt=(t==='out'?'−':'+')+fmt(P(e.amt));cls=t==='out'?'out':'in'}
+  return '<div class="row" data-act="edit" data-kind="m" data-id="'+e.id+'"><div><div class="t">'+esc(title)+'</div><div class="s">'+sub+'</div></div><div class="r"><div class="num '+cls+'">'+amt+'</div>'+badgeOf(e)+'</div></div>';
+}
+function badgeOf(e){return e.grp?'<div style="margin-top:4px"><span class="badge p">Cash swap</span></div>':e.type==='ret'?'<div style="margin-top:4px"><span class="badge">Returned back</span></div>':''}
+function rowI(i){
+  var done=i.status==='done';
+  return '<div class="row" data-act="edit" data-kind="i" data-id="'+i.id+'"><div><div class="t">'+esc(i.name)+(i.qty&&i.qty!=='1'?' × '+esc(i.qty):'')+'</div><div class="s">'+fdate(i.date)+' · '+(i.dir==='in'?'received from ':'given to ')+esc(i.person||'(no name)')+(i.fund?' · '+esc(fname(i.fund)):'')+(i.note?' · '+esc(i.note):'')+'</div></div>'
+   +'<div class="r"><span class="badge '+(done?'':'p')+'">'+(i.dir==='in'?'Item in':'Item out')+'</span><div style="margin-top:6px"><button class="btn sm" data-act="toggle" data-id="'+i.id+'">'+(done?'Settled':'Pending')+'</button></div></div></div>';
+}
+/* a row inside one person's ledger of one fund: the fund is already known */
+function rowL(e){
+  var t=e.type,lab={in:'Received',out:'Paid out',ret:'Returned back'}[t];
+  return '<div class="row" data-act="edit" data-kind="m" data-id="'+e.id+'"><div><div class="t">'+lab+'</div><div class="s">'+fdate(e.date)+' · '+esc(aname(e.acc))+(e.note?' · '+esc(e.note):'')+'</div></div><div class="r"><div class="num '+(t==='out'?'out':'in')+'">'+(t==='out'?'−':'+')+fmt(P(e.amt))+'</div>'+badgeOf(e)+'</div></div>';
+}
+
+/* ---------- Home ---------- */
+function vHome(C){
+  var d=new Date(),hand=totalOf(C),own=sumKind(C,'own'),held=sumKind(C,'person'),ev=sumKind(C,'event');
+  var pos=Math.max(0,own)+Math.max(0,held)+Math.max(0,ev)||1;
+  var h=header('Family Khata',DAYS[d.getDay()]+', '+d.getDate()+' '+MON[d.getMonth()]+' '+d.getFullYear());
+  if(demo)h+='<div class="sample"><span>Example entries. Nothing here is saved.</span><button class="btn sm" data-act="exitdemo">Close example</button></div>';
+  h+=alerts(C);
+  h+='<section class="card hero"><p class="lbl">In cash and bank now</p><p class="big num '+amtCls(hand)+'">'+fmt(hand)+'</p>'
+   +'<p class="small">Whose money it is:</p>'
+   +'<div class="bar" role="img" aria-label="Split of the money"><i style="width:'+(Math.max(0,own)/pos*100)+'%;background:var(--c-own)"></i><i style="width:'+(Math.max(0,held)/pos*100)+'%;background:var(--c-held)"></i><i style="width:'+(Math.max(0,ev)/pos*100)+'%;background:var(--c-event)"></i></div>'
+   +'<div class="legend">'+leg('var(--c-own)','My own',own)+leg('var(--c-held)','Held for family',held)+leg('var(--c-event)','Event funds',ev)+'</div></section>';
+  if(!S.entries.length&&!S.items.length&&!demo){
+    h+='<section class="card"><h3 class="sub3">Start here</h3><ol class="steps help"><li>Open <b>Family</b> and add each family member. Tick <b>Keep money for them</b> for anyone who leaves money with you.</li><li>Tap <b>Add</b> and choose <b>Received</b> for what you hold today. Pick the account and whose money it is.</li><li>Record every payment as <b>Paid out</b> and every gift as <b>Item</b>. Events (engagement, marriage, birth) live under <b>Events</b>.</li></ol>'
+     +'<div class="actions" style="margin-top:12px"><button class="btn" data-act="sample">Look at example entries</button></div></section>';
+  }
+  var pend=S.items.filter(function(i){return i.status==='pending'});
+  if(pend.length)h+='<h2 class="sec">Items pending</h2><section class="card">'+pend.slice(0,4).map(rowI).join('')+(pend.length>4?'<div class="actions" style="margin-top:8px"><button class="btn sm" data-act="pending">See all '+pend.length+'</button></div>':'')+'</section>';
+  h+='<h2 class="sec">Accounts</h2>';
+  S.accounts.forEach(function(a){
+    var parts=S.funds.map(function(f){return [f,C.cell[a.id+'|'+f.id]||0]}).filter(function(x){return x[1]!==0});
+    h+='<section class="card acct"><div class="head"><button class="linkbtn" data-act="acct" data-id="'+a.id+'" style="font-weight:600">'+esc(a.name)+'</button><span class="num '+amtCls(C.acc[a.id])+'" style="font-size:20px">'+fmt(C.acc[a.id]||0)+'</span></div>'
+     +(parts.length?'<div class="split">'+parts.map(function(x){return '<div><span>'+esc(x[0].name)+'</span><span class="num '+amtCls(x[1])+'">'+fmt(x[1])+'</span></div>'}).join('')+'</div>':'')
+     +'<div class="actions"><button class="btn sm" data-act="acct" data-id="'+a.id+'">Statement</button><button class="btn sm" data-act="recon" data-id="'+a.id+'">Check against real balance</button><button class="btn sm" data-act="editacc" data-id="'+a.id+'">Rename</button></div></section>';
+  });
+  var rec=recent(5);
+  h+='<h2 class="sec">Latest</h2><section class="card">'+(rec.length?rec.map(rowAny).join(''):'<p class="empty">Nothing recorded yet.</p>')+'</section>';
+  return h;
+}
+function leg(col,label,p){return '<div><span class="l"><span class="dot" style="background:'+col+'"></span>'+label+'</span><span class="num '+amtCls(p)+'">'+fmt(p)+'</span></div>'}
+function alerts(C){
+  var h='';
+  if(mode==='local'&&!demo)h+='<div class="alert"><span><b>Saved on this phone only.</b> '+(getCfg()?'Sign in to sync your records.':'Turn on sync in More.')+'</span><button data-act="tab" data-v="more">More</button></div>';
+  if(offerUpload&&!demo)h+='<div class="alert"><span>This phone has records that are not synced yet.</span><button data-act="upload">Upload</button></div>';
+  S.funds.forEach(function(f){var b=C.fund[f.id]||0;if(b<0)h+='<div class="alert"><span><b>'+esc(f.name)+'</b> shows '+fmt(b)+'. Some money coming in is missing.</span><button data-act="fund" data-id="'+f.id+'">Open</button></div>'});
+  var n=S.entries.length+S.items.length;
+  if(n&&mode==='local'){var last=lsGet('khata.lastBackup');var age=last?Math.round((new Date(today())-new Date(last))/864e5):null;
+    if(age===null||age>=7)h+='<div class="alert"><span>'+(age===null?'No backup saved yet.':'Last backup was '+age+' days ago.')+' Save one so nothing is lost.</span><button data-act="tab" data-v="more">Back up</button></div>'}
+  if(!storageOK&&mode==='local')h+='<div class="alert"><span><b>This phone is not keeping the data.</b> Save a backup now.</span><button data-act="tab" data-v="more">Back up</button></div>';
+  return h;
+}
+
+/* ---------- Family: one account per member ---------- */
+function fundRow(C,f,showMember){
+  var b=C.held[f.id]||0,sub;
+  if(f.kind==='event')sub=esc(f.etype||'Event')+(showMember&&f.member?' of '+esc(f.member):'')+(f.date?' · '+fdate(f.date):'');
+  else{var parts=S.accounts.map(function(a){return [a,C.cell[a.id+'|'+f.id]||0]}).filter(function(x){return x[1]!==0}).map(function(x){return esc(x[0].name)+' '+fmt(x[1])}).join(' · ');sub=parts||'No money in it'}
+  return '<div class="row" data-act="fund" data-id="'+f.id+'"><div><div class="t">'+esc(f.name)+'</div><div class="s">'+sub+'</div></div><div class="r num '+amtCls(b)+'" style="font-size:17px">'+fmt(b)+'</div></div>';
+}
+function vFamily(C){
+  var h=header('Family','One account for each member, with their events');
+  h+='<div class="actions" style="margin:0 0 12px"><button class="btn pri" data-act="newperson">Add a family member</button></div>';
+  var own=S.funds.filter(function(f){return f.kind==='own'})[0];
+  if(own)h+='<h2 class="sec">Mine</h2><section class="card">'+fundRow(C,own)+'<div class="actions" style="margin-top:8px"><button class="btn sm" data-act="editfund" data-id="'+own.id+'">Rename</button></div></section>';
+  var ps=allPeople(),fam=ps.filter(isFamily),oth=ps.filter(function(n){return !isFamily(n)});
+  h+='<h2 class="sec">Family members</h2><section class="card">'+(fam.length?fam.map(function(n){
+    var pf=personFund(n),evs=eventsOf(n),r=personRec(n),bits=[];
+    bits.push(pf?'Holding '+fmt(C.held[pf.id]||0):'No money held');
+    bits.push(evs.length?evs.length+' event'+(evs.length>1?'s':''):'No events');
+    return '<div class="row" data-act="member" data-name="'+esc(n)+'"><div><div class="t">'+esc(n)+(r&&r.rel?' <span class="badge f">'+esc(r.rel)+'</span>':'')+'</div><div class="s">'+bits.join(' · ')+'</div></div><div class="r num" style="font-size:17px">'+(pf?fmt(C.held[pf.id]||0):'')+'</div></div>'}).join(''):'<p class="empty">Add the people in your family. Each one gets an account for money held for them and a list of their events.</p>')+'</section>';
+  if(oth.length)h+='<h2 class="sec">Others</h2><section class="card">'+oth.map(function(n){var t=personCtx(n).tot;
+    return '<div class="row" data-act="person" data-name="'+esc(n)+'"><div><div class="t">'+esc(n)+'</div><div class="s">Gave '+fmt(t.gave)+' · Got '+fmt(t.got-t.back)+'</div></div></div>'}).join('')+'</section>';
+  return h;
+}
+function vMember(C,name){
+  var r=personRec(name),pf=personFund(name),evs=eventsOf(name);
+  var h=backBtn()+header(name,(r&&r.rel?r.rel+' · ':'')+'Family account');
+  h+='<h2 class="sec">Money held for '+esc(name)+'</h2>';
+  if(pf){
+    h+='<section class="card"><div class="row" data-act="fund" data-id="'+pf.id+'" style="padding-top:0"><div><div class="t">Held now</div><div class="s">What you are keeping for '+esc(name)+'</div></div><div class="r num" style="font-size:24px">'+fmt(C.held[pf.id]||0)+'</div></div>'
+     +S.accounts.map(function(a){var v=C.cell[a.id+'|'+pf.id]||0;return v?'<div class="kv"><span class="help">in '+esc(a.name)+'</span><span class="num">'+fmt(v)+'</span></div>':''}).join('')
+     +'<div class="actions"><button class="btn pri" data-act="fund" data-id="'+pf.id+'">Open ledger</button><button class="btn" data-act="add" data-fund="'+pf.id+'">Add entry</button></div></section>';
+  }else h+='<section class="card"><p class="help">You are not keeping any money for '+esc(name)+'.</p><div class="actions"><button class="btn" data-act="holdfund" data-name="'+esc(name)+'">Start holding money for '+esc(name)+'</button></div></section>';
+  h+='<h2 class="sec">'+esc(poss(name))+' events</h2><section class="card">'+(evs.length?evs.map(function(f){return fundRow(C,f)}).join(''):'<p class="empty">No events yet.</p>')
+   +'<div class="actions" style="margin-top:8px"><button class="btn" data-act="newevent" data-name="'+esc(name)+'">New event for '+esc(name)+'</button></div></section>';
+  h+='<div class="actions"><button class="btn" data-act="person" data-name="'+esc(name)+'">Everything involving '+esc(name)+'</button><button class="btn" data-act="editperson" data-name="'+esc(name)+'">Edit</button></div>';
+  return h;
+}
+
+/* ---------- Events ---------- */
+function vEvents(C){
+  var h=header('Events','Each event keeps its own money and people')+'<div class="actions" style="margin:0 0 12px"><button class="btn pri" data-act="newfund">New event</button></div>';
+  var evs=S.funds.filter(function(f){return f.kind==='event'}),groups={},order=[];
+  evs.forEach(function(f){var m=(f.member||'').trim()||'Other events',k=norm(m);if(!groups[k]){groups[k]={m:m,l:[]};order.push(k)}groups[k].l.push(f)});
+  if(!evs.length)h+='<section class="card"><p class="empty">Add an event such as an engagement, marriage or birth, and say whose it is.</p></section>';
+  order.forEach(function(k){var g=groups[k];g.l.sort(function(a,b){return (b.date||'')<(a.date||'')?-1:1});
+    h+='<div class="grp">'+esc(g.m)+'</div><section class="card">'+g.l.map(function(f){return fundRow(C,f)}).join('')+'</section>'});
+  return h;
+}
+
+/* ---------- One fund (a member's held money, or one event) ---------- */
+function vFund(C,id){
+  var f=fundById(id);if(!f)return backBtn()+header('Fund')+'<p class="empty">This fund no longer exists.</p>';
+  var sub=f.kind==='own'?'My own money':f.kind==='person'?'Money held for '+f.name:(f.etype||'Event')+(f.member?' of '+f.member:'')+(f.date?' · '+fdate(f.date):'');
+  var held=C.held[id]||0,sm=fundSummary(id),L=lines(id);
+  var h=backBtn()+header(f.name,sub);
+  h+='<section class="card"><div class="kv"><span>'+(f.kind==='person'?'Held for '+esc(f.name):f.kind==='event'?'Event balance':'Balance')+'</span><span class="num '+amtCls(held)+'" style="font-size:24px">'+fmt(held)+'</span></div>'
+   +S.accounts.map(function(a){var v=C.cell[a.id+'|'+id]||0;return v?'<div class="kv"><span class="help">in '+esc(a.name)+'</span><span class="num">'+fmt(v)+'</span></div>':''}).join('')
+   +'<div class="actions"><button class="btn pri" data-act="add" data-fund="'+id+'">Add to this '+(f.kind==='event'?'event':'account')+'</button><button class="btn" data-act="editfund" data-id="'+id+'">Edit</button></div></section>';
+  h+='<h2 class="sec">'+(f.kind==='person'?'Where the money came from':'Who gave')+'</h2><section class="card">'
+   +(sm.src.length?sm.src.map(function(s){return '<div class="row'+(s.name?'':' plain')+'" '+(s.name?'data-act="fperson" data-fid="'+id+'" data-name="'+esc(s.name)+'"':'')+' style="padding:8px 0"><div class="t" style="font-weight:400">'+esc(s.label)+'</div><div class="r num in">'+fmt(s.amt)+'</div></div>'}).join(''):'<p class="empty">Nothing added yet.</p>')
+   +'<div class="kv tot"><span>Total added</span><span class="num">'+fmt(sm.added)+'</span></div></section>';
+  h+='<h2 class="sec">Spent from this '+(f.kind==='event'?'event':'money')+'</h2><section class="card">'
+   +'<div class="kv"><span class="help">Paid out to people</span><span class="num out">−'+fmt(sm.paid)+'</span></div>'
+   +'<div class="kv"><span class="help">Returned back</span><span class="num in">+'+fmt(sm.back)+'</span></div>'
+   +(sm.mvout?'<div class="kv"><span class="help">Moved to other funds</span><span class="num out">−'+fmt(sm.mvout)+'</span></div>':'')
+   +'<div class="kv tot"><span>Spent, after returns</span><span class="num">'+fmt(sm.paid-sm.back+sm.mvout)+'</span></div>'
+   +'<div class="kv tot" style="margin-top:0"><span>Held now</span><span class="num">'+fmt(sm.added-sm.paid+sm.back-sm.mvout)+'</span></div></section>';
+  if(sm.who.length){
+    var tg=0,tb=0;sm.who.forEach(function(x){tg+=x.got;tb+=x.back});
+    h+='<h2 class="sec">Who got what</h2><section class="card"><div class="tscroll"><table class="tbl"><thead><tr><th>Person</th><th>Paid</th><th>Back</th><th>Got</th></tr></thead><tbody>'
+     +sm.who.map(function(x){return '<tr><td><button class="linkbtn" data-act="fperson" data-fid="'+id+'" data-name="'+esc(x.name)+'">'+esc(x.name)+'</button></td><td class="num">'+fmt(x.got)+'</td><td class="num">'+fmt(x.back)+'</td><td class="num">'+fmt(x.got-x.back)+'</td></tr>'}).join('')
+     +'<tr class="tt"><td>Total</td><td class="num">'+fmt(tg)+'</td><td class="num">'+fmt(tb)+'</td><td class="num">'+fmt(tg-tb)+'</td></tr></tbody></table></div><p class="help" style="margin-top:6px">Tap a name for their ledger in this '+(f.kind==='event'?'event':'account')+' only.</p></section>';
+  }
+  var its=S.items.filter(function(i){return i.fund===id});
+  if(its.length)h+='<h2 class="sec">Items</h2><section class="card">'+its.map(rowI).join('')+'</section>';
+  h+='<h2 class="sec">Statement</h2><section class="card">'+(L.length?L.slice().reverse().map(function(l){
+    var e=l.e,t=e.type,title;
+    if(t==='move')title=l.mv==='in'?'Moved in from '+fname(e.fund):'Moved out to '+fname(e.toFund);else title=VERB[t]+(effPerson(e)||'(no name)');
+    var ac=l.mv==='in'?e.toAcc:e.acc;
+    return '<div class="row" data-act="edit" data-kind="m" data-id="'+e.id+'"><div><div class="t">'+esc(title)+'</div><div class="s">'+fdate(e.date)+' · '+esc(aname(ac))+(e.note?' · '+esc(e.note):'')+'</div></div><div class="r"><div class="num '+(l.d>0?'in':'out')+'">'+(l.d>0?'+':'−')+fmt(Math.abs(l.d))+'</div><div class="s num">bal '+fmt(l.run)+'</div></div></div>'}).join(''):'<p class="empty">No entries yet.</p>')+'</section>';
+  h+='<div class="actions"><button class="btn" data-act="csvfund" data-id="'+id+'">Save this report (CSV)</button></div>';
+  return h;
+}
+
+/* ---------- One person's ledger inside one fund only ---------- */
+function vFperson(C,fid,name){
+  var f=fundById(fid);if(!f)return backBtn()+header(name)+'<p class="empty">This fund no longer exists.</p>';
+  var k=norm(name),gave=0,got=0,bk=0;
+  var ents=S.entries.filter(function(e){return e.type!=='move'&&e.fund===fid&&norm(effPerson(e))===k}).sort(function(a,b){return a.date<b.date?1:a.date>b.date?-1:(b.createdAt||0)-(a.createdAt||0)});
+  ents.forEach(function(e){var p=P(e.amt);if(e.type==='in')gave+=p;else if(e.type==='out')got+=p;else bk+=p});
+  var its=S.items.filter(function(i){return i.fund===fid&&norm(i.person)===k}).sort(function(a,b){return a.date<b.date?1:-1});
+  var h=backBtn()+header(name,'Ledger in '+f.name+' only');
+  h+='<section class="card"><div class="kv"><span class="help">Gave to '+esc(f.name)+'</span><span class="num in">'+fmt(gave)+'</span></div>'
+   +'<div class="kv"><span class="help">Paid to '+esc(name)+'</span><span class="num out">'+fmt(got)+'</span></div>'
+   +'<div class="kv"><span class="help">Returned back</span><span class="num in">'+fmt(bk)+'</span></div>'
+   +'<div class="kv tot"><span>'+esc(name)+' got, after returns</span><span class="num" style="font-size:18px">'+fmt(got-bk)+'</span></div>'
+   +'<div class="actions"><button class="btn pri" data-act="add" data-fund="'+fid+'" data-person="'+esc(name)+'">Add entry</button><button class="btn" data-act="csvfperson" data-fid="'+fid+'" data-name="'+esc(name)+'">Save ledger (CSV)</button></div></section>';
+  h+='<h2 class="sec">Money</h2><section class="card">'+(ents.length?ents.map(rowL).join(''):'<p class="empty">No money entries for '+esc(name)+' here.</p>')+'</section>';
+  if(its.length)h+='<h2 class="sec">Items</h2><section class="card">'+its.map(rowI).join('')+'</section>';
+  return h;
+}
+
+/* ---------- Account statement ---------- */
+function acctLines(id){
+  var out=[];
+  S.entries.forEach(function(e){var p=P(e.amt),t=e.type;
+    if(e.acc===id)out.push({e:e,d:(t==='in'||t==='ret')?p:-p,mv:t==='move'?'out':''});
+    if(t==='move'&&e.toAcc===id)out.push({e:e,d:p,mv:'in'})});
+  out.sort(function(a,b){return a.e.date<b.e.date?-1:a.e.date>b.e.date?1:(a.e.createdAt||0)-(b.e.createdAt||0)});
+  var run=0;out.forEach(function(l){run+=l.d;l.run=run});return out;
+}
+function vAcct(C,id){
+  var a=accById(id);if(!a)return backBtn()+header('Account')+'<p class="empty">This account no longer exists.</p>';
+  var L=acctLines(id),inn=0,outt=0;L.forEach(function(l){if(l.d>0)inn+=l.d;else outt-=l.d});
+  var h=backBtn()+header(a.name,a.kind==='cash'?'Cash in hand':'Bank, UPI or wallet');
+  h+='<section class="card"><div class="kv"><span>Balance now</span><span class="num '+amtCls(C.acc[id])+'" style="font-size:24px">'+fmt(C.acc[id]||0)+'</span></div>'
+   +'<div class="kv"><span class="help">Total in</span><span class="num in">'+fmt(inn)+'</span></div><div class="kv"><span class="help">Total out</span><span class="num out">−'+fmt(outt)+'</span></div>'
+   +'<div class="actions"><button class="btn" data-act="recon" data-id="'+id+'">Check against real balance</button><button class="btn" data-act="csvacct" data-id="'+id+'">Save statement (CSV)</button></div></section>';
+  var parts=S.funds.map(function(f){return [f,C.cell[id+'|'+f.id]||0]}).filter(function(x){return x[1]!==0});
+  h+='<h2 class="sec">Whose money is in it</h2><section class="card">'+(parts.length?parts.map(function(x){return '<div class="row" data-act="fund" data-id="'+x[0].id+'"><div><div class="t">'+esc(x[0].name)+'</div></div><div class="r num '+amtCls(x[1])+'">'+fmt(x[1])+'</div></div>'}).join(''):'<p class="empty">Nothing in it.</p>')+'</section>';
+  var rows=L.slice().reverse(),cap=acctAll?rows.length:150;
+  h+='<h2 class="sec">Statement</h2><section class="card">'+(rows.length?rows.slice(0,cap).map(function(l){var e=l.e,t=e.type,title;
+    if(t==='move')title=l.mv==='in'?'Moved in from '+aname(e.acc):'Moved out to '+aname(e.toAcc);else title=VERB[t]+(effPerson(e)||'(no name)');
+    var fd=l.mv==='in'?e.toFund:e.fund;
+    return '<div class="row" data-act="edit" data-kind="m" data-id="'+e.id+'"><div><div class="t">'+esc(title)+'</div><div class="s">'+fdate(e.date)+' · '+esc(fname(fd))+(e.note?' · '+esc(e.note):'')+'</div></div><div class="r"><div class="num '+(l.d>0?'in':'out')+'">'+(l.d>0?'+':'−')+fmt(Math.abs(l.d))+'</div><div class="s num">bal '+fmt(l.run)+'</div></div></div>'}).join('')
+    +(rows.length>cap?'<div class="actions" style="margin-top:8px"><button class="btn sm" data-act="acctall">Show all '+rows.length+'</button></div>':''):'<p class="empty">No entries yet.</p>')+'</section>';
+  return h;
+}
+
+/* ---------- Entries ---------- */
+function vEntries(){
+  var h=header('Entries','Everything you recorded, newest first');
+  h+='<input class="search" id="q" type="search" placeholder="Search name, note, fund" value="'+esc(Q)+'" aria-label="Search entries">';
+  h+='<div class="chips">'+[['all','All'],['money','Money'],['items','Items'],['pending','Items pending']].map(function(c){return '<button class="chip" data-act="flt" data-v="'+c[0]+'" aria-pressed="'+(flt===c[0])+'">'+c[1]+'</button>'}).join('')+'</div><div id="list"></div>';
+  return h;
+}
+function listEntries(){
+  var q=norm(Q);
+  var arr=merged().filter(function(r){var o=r.o;
+    if(flt==='money'&&r.k!=='m')return false;if(flt==='items'&&r.k!=='i')return false;
+    if(flt==='pending'&&!(r.k==='i'&&o.status==='pending'))return false;
+    if(!q)return true;
+    var hay=[o.note,o.person,o.name,fname(o.fund),o.type==='move'?fname(o.toFund):'',o.amt,aname(o.acc)].join(' ').toLowerCase();return hay.indexOf(q)>=0});
+  var h='',lastD='';
+  arr.forEach(function(r){if(r.o.date!==lastD){lastD=r.o.date;h+='<div class="grp">'+fdate(lastD)+'</div>'}h+='<div class="card" style="margin:0 0 6px;padding:2px 14px">'+rowAny(r)+'</div>'});
+  $('#list').innerHTML=h||'<p class="empty">Nothing matches.</p>';
+}
+
+/* ---------- Everything involving one person, kept apart by fund ---------- */
+function ctxTitle(fid){
+  if(fid==='_')return {t:'No fund',s:'Items not linked to a fund'};
+  var f=fundById(fid);if(!f)return {t:'(removed fund)',s:''};
+  if(f.kind==='own')return {t:'My own money',s:'Dealings with your own money'};
+  if(f.kind==='person')return {t:poss(f.name)+' held money',s:'Money kept with you for '+f.name};
+  return {t:f.name,s:'Event'+(f.etype?' · '+f.etype:'')+(f.member?' of '+f.member:'')+(f.date?' · '+fdate(f.date):'')};
+}
+function vPerson(C,name){
+  var pc=personCtx(name),t=pc.tot,r=personRec(name);
+  var pendItems=S.items.filter(function(i){return norm(i.person)===norm(name)&&i.status==='pending'}).length;
+  var h=backBtn()+header(name,'Everything involving '+name+', kept apart by money and event');
+  h+='<section class="card"><div class="kv"><span class="help">Gave (all funds)</span><span class="num in">'+fmt(t.gave)+'</span></div>'
+   +'<div class="kv"><span class="help">Paid to them</span><span class="num out">'+fmt(t.got)+'</span></div>'
+   +'<div class="kv"><span class="help">Returned back</span><span class="num in">'+fmt(t.back)+'</span></div>'
+   +'<div class="kv tot"><span>Got, after returns</span><span class="num" style="font-size:18px">'+fmt(t.got-t.back)+'</span></div>'
+   +(pendItems?'<div class="kv"><span class="help">Items pending</span><span class="num">'+pendItems+'</span></div>':'')
+   +'<div class="actions">'+(isFamily(name)?'<button class="btn" data-act="member" data-name="'+esc(name)+'">Open account</button>':'<button class="btn" data-act="editperson" data-name="'+esc(name)+'">Edit person</button>')+'<button class="btn" data-act="csvperson" data-name="'+esc(name)+'">Save report (CSV)</button></div></section>';
+  if(!pc.ctx.length)h+='<section class="card"><p class="empty">No entries with this person yet.</p></section>';
+  pc.ctx.forEach(function(c){var ti=ctxTitle(c.fid);
+    h+='<section class="ctx"><div class="hd" '+(c.fid!=='_'?'data-act="fperson" data-fid="'+c.fid+'" data-name="'+esc(name)+'"':'')+'><div><div class="t">'+esc(ti.t)+'</div><div class="s">'+esc(ti.s)+'</div></div></div>'
+     +'<div class="mini"><div><div class="k">Gave</div><div class="v num">'+fmt(c.gave)+'</div></div><div><div class="k">Paid</div><div class="v num">'+fmt(c.got)+'</div></div><div><div class="k">Back</div><div class="v num">'+fmt(c.back)+'</div></div><div><div class="k">Got</div><div class="v num">'+fmt(c.got-c.back)+'</div></div></div>'
+     +'<div class="rows">'+c.rows.map(rowAny).join('')+'</div></section>'});
+  return h;
+}
+
+/* ---------- More ---------- */
+function syncCard(){
+  var cfg=getCfg(),h='<h2 class="sec">Sync across phones</h2><section class="card">';
+  if(demo)return h+'<p class="help">Close the example first.</p></section>';
+  if(!cfg){
+    h+='<p class="help" style="margin-bottom:10px">Records are saved <b>on this phone only</b>. To share them across phones, and keep them safe if a phone is lost or changed, turn on sync. Paste the Firebase settings (see the setup guide), or the setup text copied from your other phone.</p>'
+     +'<label class="fld"><span>Firebase settings or setup text</span><textarea class="code" id="sy_cfg" placeholder="Paste here">'+esc(SY.cfg)+'</textarea></label>'
+     +(SY.err?'<p class="err" role="alert">'+esc(SY.err)+'</p>':'')
+     +'<div class="actions"><button class="btn pri" data-act="sy_cfg">Save and continue</button></div>';
+  }else if(!fbUser){
+    h+=(syncState==='error'?'':'<p class="help" style="margin-bottom:10px">Sync is set up, but this phone is not signed in. On the <b>first</b> phone, choose <b>Create account</b>. On every other phone, use <b>Sign in</b> with the same email and password.</p>'
+     +'<label class="fld"><span>Email</span><input type="email" id="sy_email" autocomplete="username" value="'+esc(SY.email||lsGet('khata.email')||'')+'"></label>'
+     +'<label class="fld"><span>Password (at least 6 characters)</span><input type="password" id="sy_pw" autocomplete="current-password" value="'+esc(SY.pw)+'"></label>')
+     +(SY.err?'<p class="err" role="alert">'+esc(SY.err)+'</p>':'')
+     +(syncState==='error'?'':'<div class="actions"><button class="btn pri" data-act="sy_in"'+(SY.busy?' disabled':'')+'>Sign in</button><button class="btn" data-act="sy_new"'+(SY.busy?' disabled':'')+'>Create account</button></div>');
+  }else{
+    var off=typeof navigator!=='undefined'&&navigator.onLine===false;
+    h+='<p class="help"><b>'+(off?'Offline. Your changes are kept and will upload when the phone is online.':syncState==='ok'?'Synced.':'Syncing…')+'</b> Signed in as '+esc(fbUser.email||'')+'. Every phone signed in with this account shows the same records.</p>'
+     +(SY.err?'<p class="err" role="alert">'+esc(SY.err)+'</p>':'')
+     +(offerUpload?'<div class="alert" style="margin-top:10px"><span>This phone has records that are not synced yet.</span><button data-act="upload">Upload</button></div><div class="actions"><button class="btn sm" data-act="dismissupload">No, skip them</button></div>':'')
+     +'<div class="actions" style="margin-top:10px"><button class="btn" data-act="sy_copy">Copy setup text for another phone</button><button class="btn" data-act="sy_out" data-confirm="1">Sign out</button></div>'
+     +'<p class="help" style="margin-top:8px">On the other phone, open the app, go to More, paste the setup text, then sign in with the same email and password.</p>';
+  }
+  return h+'</section>';
+}
+function installCard(){
+  var standalone=(window.matchMedia&&matchMedia('(display-mode: standalone)').matches)||navigator.standalone;
+  var h='<h2 class="sec">Use it like an app</h2><section class="card">';
+  if(standalone)return h+'<p class="help">You are using the installed app.</p></section>';
+  if(deferredPrompt)h+='<div class="actions" style="margin:0 0 10px"><button class="btn pri" data-act="install">Install on this phone</button></div>';
+  return h+'<ul class="steps help" style="margin:0"><li><b>Android (Chrome):</b> open the menu (three dots), then Install app or Add to Home screen.</li><li><b>iPhone (Safari):</b> tap the Share button, then Add to Home Screen.</li></ul></section>';
+}
+function vMore(C){
+  var h=header('More','Sharing, accounts and backup');
+  h+='<h2 class="sec">How the khata works</h2><section class="card"><ul class="steps help" style="margin:0">'
+   +'<li><b>Received</b>: money comes in. Choose whose money it is, or which event.</li>'
+   +'<li><b>Paid out</b>: money goes to someone. Lending is also paid out.</li>'
+   +'<li><b>Returned back</b>: a person gives some back. It lowers what they got and is not new money.</li>'
+   +'<li><b>Move</b>: shift cash to bank, or money between funds.</li>'
+   +'<li>A balance can never go below zero. If an entry would do that, the page says why and does not save it.</li></ul></section>';
+  h+=syncCard()+installCard();
+  h+='<h2 class="sec">Accounts</h2><p class="help" style="margin:0 0 8px">Tap an account to rename it, for example to your bank’s name.</p><section class="card">'+S.accounts.map(function(a){return '<div class="row" data-act="editacc" data-id="'+a.id+'"><div><div class="t">'+esc(a.name)+'</div><div class="s">'+(a.kind==='cash'?'Cash in hand':'Bank, UPI or wallet')+'</div></div><div class="r num">'+fmt(C.acc[a.id]||0)+'</div></div>'}).join('')
+   +'<div class="actions" style="margin-top:10px"><button class="btn" data-act="newacc">Add an account</button></div></section>';
+  var lb=lsGet('khata.lastBackup');
+  h+='<h2 class="sec">Backup</h2><section class="card"><p class="help" style="margin-bottom:10px">A backup file is a copy you keep yourself. '+(lb?'Last backup from this phone: <b>'+fdate(lb)+'</b>.':'<b>No backup saved from this phone yet.</b>')+'</p>'
+   +'<div class="actions"><button class="btn pri" data-act="backup">Save or share backup file</button><button class="btn" data-act="csv">Save all as spreadsheet (CSV)</button></div>'
+   +'<div class="actions"><button class="btn" data-act="copybackup">Copy backup text</button></div>'
+   +'<h3 class="sub3" style="margin-top:16px">Restore from a backup</h3><label class="fld"><span>Choose a backup file</span><input type="file" id="file" accept=".json,application/json,text/plain"></label>'
+   +'<label class="fld"><span>Or paste backup text</span><textarea class="code" id="paste" placeholder="Paste the copied backup text here"></textarea></label>'
+   +'<div class="actions"><button class="btn" data-act="restore" data-confirm="1">Restore</button></div><p class="help" style="margin-top:8px">Restoring replaces everything currently in the app'+(mode==='sync'?', on every synced phone':'')+'.</p></section>';
+  h+='<h2 class="sec">Start over</h2><section class="card"><p class="help" style="margin-bottom:10px">Erase every entry, fund and account'+(mode==='sync'?' on every synced phone':' from this phone')+'.</p><div class="actions"><button class="btn danger" data-act="wipe" data-confirm="1">Erase everything</button></div></section>';
+  return h;
+}
+
+/* ---------- Add / edit sheet ---------- */
+function newF(type,fund,person){
+  var la=lsGet('khata.lastAcc');var acc=la&&accById(la)?la:S.accounts[0].id;
+  var other=S.accounts.filter(function(a){return a.id!==acc})[0];
+  return {type:type||'in',date:today(),amt:'',acc:acc,fund:fund||'own',person:person||'',note:'',toAcc:other?other.id:acc,toFund:fund||'own',name:'',qty:'1',status:'pending',
+    newName:'',newKind:'event',newType:'Engagement',newMember:'',newFor:null,err:'',editId:null,createdAt:null};
+}
+function openAdd(type,fund,person){F=newF(type,fund,person);sheetForm()}
+function openEdit(kind,id){
+  var o=(kind==='m'?S.entries:S.items).filter(function(x){return x.id===id})[0];if(!o)return;
+  if(kind==='m'&&o.grp)return sheetSwap(o.grp);
+  F=newF('in');
+  if(kind==='m'){F.type=o.type;F.date=o.date;F.amt=String(o.amt);F.acc=o.acc;F.fund=o.fund;F.person=o.person||'';F.note=o.note||'';F.toAcc=o.toAcc||F.toAcc;F.toFund=o.toFund||F.toFund}
+  else{F.type=o.dir==='in'?'itemIn':'itemOut';F.date=o.date;F.name=o.name;F.qty=o.qty||'1';F.person=o.person||'';F.fund=o.fund||'';F.status=o.status;F.note=o.note||''}
+  F.editId=id;F.createdAt=o.createdAt;sheetForm();
+}
+function accSel(key){return '<select id="f_'+key+'" data-k="'+key+'">'+S.accounts.map(function(a){return '<option value="'+a.id+'"'+(F[key]===a.id?' selected':'')+'>'+esc(a.name)+'</option>'}).join('')+'</select>'}
+function fundSel(key,none){
+  var h='<select id="f_'+key+'" data-k="'+key+'">'+(none?'<option value="">None</option>':'');
+  [['own','Mine'],['person','Held for family'],['event','Events']].forEach(function(g){var fs=S.funds.filter(function(f){return f.kind===g[0]});
+    if(fs.length)h+='<optgroup label="'+g[1]+'">'+fs.map(function(f){return '<option value="'+f.id+'"'+(F[key]===f.id?' selected':'')+'>'+esc(f.name)+'</option>'}).join('')+'</optgroup>'});
+  h+='<option value="__new"'+(F[key]==='__new'?' selected':'')+'>+ New account or event…</option></select>';
+  if(F.newFor===key&&F[key]==='__new'){
+    h+='<div class="newbox"><label class="fld"><span>What is it?</span><select id="f_newKind" data-k="newKind"><option value="event"'+(F.newKind==='event'?' selected':'')+'>An event</option><option value="person"'+(F.newKind==='person'?' selected':'')+'>Money kept for a family member</option><option value="own"'+(F.newKind==='own'?' selected':'')+'>My own money</option></select></label>';
+    if(F.newKind==='event')h+='<div class="two2"><label class="fld"><span>Event</span><select id="f_newType" data-k="newType">'+ETYPES.map(function(x){return '<option'+(F.newType===x?' selected':'')+'>'+x+'</option>'}).join('')+'</select></label>'
+      +'<label class="fld"><span>Whose event</span><input id="f_newMember" data-k="newMember" list="people" autocomplete="off" value="'+esc(F.newMember)+'" placeholder="Family member"></label></div>'
+      +'<label class="fld" style="margin:0"><span>Name (optional)</span><input id="f_newName" data-k="newName" value="'+esc(F.newName)+'" placeholder="Made from the event and person if empty"></label>';
+    else h+='<label class="fld" style="margin:0"><span>Name</span><input id="f_newName" data-k="newName" value="'+esc(F.newName)+'" placeholder="'+(F.newKind==='person'?'Family member, e.g. Mother':'Name')+'"></label>';
+    h+='</div>';
+  }
+  return h;
+}
+function typeHint(t){
+  return ({in:'New money coming in. For a family member’s account, leave “Received from” empty if it is their own money, or write who sent it, such as Father.',
+    out:'Money going to someone: spent, handed over, or lent. Write who got it.',
+    ret:'A person gives back part of what they got. It does not count as new money.',
+    swap:'You gave cash from your own pocket, and the same amount is taken from their money in the bank. Their ledger shows they got it, and your own money stays tallied.',
+    move:'Shift cash to bank, or money from one account to another.',itemIn:'A gift or item you received.',itemOut:'A gift or item you gave.'})[t]||'';
+}
+function nameChips(){
+  var ns=F.fund&&F.fund!=='__new'?suggestNames(F.fund):[];
+  if(!ns.length)return '';
+  return '<div class="chips" style="margin:-4px 0 10px">'+ns.map(function(n){return '<button type="button" class="chip sm" data-act="pickname" data-name="'+esc(n)+'">'+esc(n)+'</button>'}).join('')+'</div>';
+}
+function sheetForm(){
+  var t=F.type,money=t==='in'||t==='out'||t==='ret'||t==='move';
+  var h='<div class="scrim" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true" aria-label="Entry"><h3>'+(F.editId?'Edit entry':'New entry')+'</h3>';
+  function tb(v,l){return '<button data-act="ftype" data-v="'+v+'" aria-pressed="'+(t===v)+'">'+l+'</button>'}
+  h+='<div class="seg">'+tb('in','Received')+tb('out','Paid out')+tb('ret','Returned back')+'</div>'
+   +'<div class="seg">'+tb('move','Move')+tb('itemIn','Item in')+tb('itemOut','Item out')+'</div>'
+   +'<div class="seg" style="grid-template-columns:1fr">'+tb('swap','Gave cash, took it from their money')+'</div>'
+   +'<p class="help" style="margin-bottom:10px">'+typeHint(t)+'</p>';
+  if(t==='swap'){
+    h+='<label class="fld"><span>Cash given (₹)</span><input class="amt" id="f_amt" data-k="amt" inputmode="decimal" autocomplete="off" value="'+esc(F.amt)+'" placeholder="0"></label>'
+     +'<label class="fld"><span>Who got the cash</span><input id="f_person" data-k="person" list="people" autocomplete="off" value="'+esc(F.person)+'" placeholder="Name"></label>'
+     +'<label class="fld"><span>Take it from whose money</span>'+fundSel('fund')+'</label>'
+     +'<div class="two2"><label class="fld"><span>Their money is in</span>'+accSel('acc')+'</label><label class="fld"><span>Cash came from</span>'+accSel('toAcc')+'</label></div>'
+     +'<label class="fld"><span>Whose cash it was</span>'+fundSel('toFund')+'</label>'
+     +'<label class="fld"><span>Date</span><input type="date" id="f_date" data-k="date" value="'+F.date+'"></label>'
+     +'<label class="fld"><span>Note</span><input id="f_note" data-k="note" value="'+esc(F.note)+'" placeholder="Optional"></label>'
+     +'<p class="help" style="margin-bottom:8px">Result: '+esc(fname(F.fund))+' goes down in '+esc(aname(F.acc))+'. '+esc(fname(F.toFund))+' goes down in '+esc(aname(F.toAcc))+' and up in '+esc(aname(F.acc))+'. Total bank stays the same; cash goes down.</p>';
+  }else if(money){
+    h+='<label class="fld"><span>Amount (₹)</span><input class="amt" id="f_amt" data-k="amt" inputmode="decimal" autocomplete="off" value="'+esc(F.amt)+'" placeholder="0"></label>';
+    if(t==='move'){
+      h+='<div class="two2"><label class="fld"><span>Take from account</span>'+accSel('acc')+'</label><label class="fld"><span>Whose money</span>'+fundSel('fund')+'</label></div>'
+       +'<div class="two2"><label class="fld"><span>Put into account</span>'+accSel('toAcc')+'</label><label class="fld"><span>Whose money</span>'+fundSel('toFund')+'</label></div>'
+       +'<label class="fld"><span>Date</span><input type="date" id="f_date" data-k="date" value="'+F.date+'"></label>';
+    }else{
+      var plab={in:'Received from',out:'Paid to',ret:'Returned by'}[t],ph=t==='in'?'Empty if it is their own money':'Name';
+      h+='<label class="fld"><span>Whose money or which event</span>'+fundSel('fund')+'</label>'
+       +'<label class="fld"><span>'+plab+'</span><input id="f_person" data-k="person" list="people" autocomplete="off" value="'+esc(F.person)+'" placeholder="'+ph+'"></label>'+nameChips()
+       +'<div class="two2"><label class="fld"><span>'+(t==='out'?'From account':'Into account')+'</span>'+accSel('acc')+'</label><label class="fld"><span>Date</span><input type="date" id="f_date" data-k="date" value="'+F.date+'"></label></div>';
+    }
+    h+='<label class="fld"><span>Note (what it was for)</span><input id="f_note" data-k="note" value="'+esc(F.note)+'" placeholder="Optional"></label>';
+  }else{
+    h+='<label class="fld"><span>Item</span><input id="f_name" data-k="name" autocomplete="off" value="'+esc(F.name)+'" placeholder="e.g. Gold ring, clothes, sweets box"></label>'
+     +'<div class="two2"><label class="fld"><span>Quantity</span><input id="f_qty" data-k="qty" inputmode="numeric" value="'+esc(F.qty)+'"></label><label class="fld"><span>Date</span><input type="date" id="f_date" data-k="date" value="'+F.date+'"></label></div>'
+     +'<label class="fld"><span>Event or account (optional)</span>'+fundSel('fund',true)+'</label>'
+     +'<label class="fld"><span>'+(t==='itemIn'?'Received from':'Given to')+'</span><input id="f_person" data-k="person" list="people" autocomplete="off" value="'+esc(F.person)+'" placeholder="Name"></label>'+nameChips()
+     +'<label class="fld"><span>Status</span><select id="f_status" data-k="status"><option value="pending"'+(F.status==='pending'?' selected':'')+'>Pending (to return or still to give)</option><option value="done"'+(F.status==='done'?' selected':'')+'>Settled</option></select></label>'
+     +'<label class="fld"><span>Note</span><input id="f_note" data-k="note" value="'+esc(F.note)+'" placeholder="Optional"></label>';
+  }
+  h+='<datalist id="people">'+allPeople().map(function(n){return '<option value="'+esc(n)+'">'}).join('')+'</datalist>';
+  if(F.err)h+='<p class="err" role="alert">'+esc(F.err)+'</p>';
+  h+='<div class="actions"><button class="btn pri" data-act="fsave">Save</button>'+(F.editId?'<button class="btn danger" data-act="fdel" data-confirm="1">Delete</button>':'<button class="btn" data-act="fsave2">Save and add another</button>')+'<button class="btn" data-act="close">Cancel</button></div></div>';
+  $('#layer').innerHTML=h;
+  var a=$('#f_amt')||$('#f_name');if(a&&!F.editId&&!F.err)setTimeout(function(){try{a.focus()}catch(e){}},50);
+}
+function formErr(m){F.err=m;sheetForm();var s=$('.sheet');if(s)s.scrollTop=s.scrollHeight}
+function makeFund(name,kind,etype,member,date){var f={id:uid(),name:name,kind:kind,ord:Date.now()};if(kind==='event'){f.etype=etype||'Other';f.member=(member||'').trim();f.date=date||''}return f}
+function eventName(etype,member){return member?poss(member)+' '+etype:etype}
+function bestAcc(fid){var C=compute(),best=S.accounts[0].id,bv=-1;S.accounts.forEach(function(a){var v=C.cell[a.id+'|'+fid]||0;if(v>bv){bv=v;best=a.id}});return best}
+function setSwapDefaults(){
+  var f=fundById(F.fund);
+  if(!f||f.kind==='own'){var pf=S.funds.filter(function(x){return x.kind==='person'})[0];if(pf){F.fund=pf.id;f=pf}}
+  if(f&&f.kind==='person'&&!F.person)F.person=f.name;
+  F.toFund='own';
+  var cash=S.accounts.filter(function(a){return a.kind==='cash'})[0];if(cash)F.toAcc=cash.id;
+  F.acc=bestAcc(F.fund);
+  if(F.acc===F.toAcc){var o=S.accounts.filter(function(a){return a.id!==F.toAcc})[0];if(o)F.acc=o.id}
+}
+/* A cash swap is three linked entries: their fund pays the person (so it shows in their ledger),
+   your fund takes the same amount in the bank, and your fund pays the cash out. Balances tally. */
+function swapEntries(o){
+  var g=uid(),ca=Date.now(),nm=o.person,f1=fname(o.fund);
+  function base(x,i){x.date=o.date;x.amt=o.amt;x.person=nm;x.grp=g;x.createdAt=ca+i;x.id=uid();return x}
+  return [base({type:'out',acc:o.acc,fund:o.fund,note:o.note||('Cash given to '+nm+', settled from '+f1)},0),
+          base({type:'in',acc:o.acc,fund:o.toFund,note:'Taken from '+f1+' for cash given to '+nm},1),
+          base({type:'out',acc:o.toAcc,fund:o.toFund,note:'Cash given to '+nm+', settled from '+f1},2)];
+}
+function saveSwap(){
+  var amt=parseFloat(String(F.amt).replace(/,/g,''));
+  if(!(amt>0))return formErr('Enter an amount greater than zero.');
+  var nm=(F.person||'').trim();if(!nm)return formErr('Write who got the cash.');
+  if(!F.date)return formErr('Pick a date.');
+  if(F.fund==='__new'||F.toFund==='__new')return formErr('Choose from the list for both fund choices.');
+  if(F.fund===F.toFund)return formErr('Choose two different funds: the money it is taken from, and whose cash was given.');
+  if(F.acc===F.toAcc)return formErr('Their money and the cash must be in different accounts, for example bank and cash.');
+  var es=swapEntries({date:F.date,amt:Math.round(amt*100)/100,person:nm,fund:F.fund,acc:F.acc,toFund:F.toFund,toAcc:F.toAcc,note:(F.note||'').trim()});
+  var err=validate(S.entries.concat(es));if(err)return formErr(err);
+  es.forEach(function(e){put('entries',e)});lsSet('khata.lastAcc',F.toAcc);
+  closeSheet();render();toast('Saved');
+}
+function sheetSwap(grp,err){
+  var es=S.entries.filter(function(e){return e.grp===grp}).sort(function(a,b){return (a.createdAt||0)-(b.createdAt||0)});
+  var h='<div class="scrim" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true"><h3>Cash swap</h3><p class="help" style="margin-bottom:8px">These entries were saved together so every balance tallies. To change it, delete the swap and record it again.</p>'
+   +es.map(function(e){return '<div class="kv"><span>'+esc(KL[e.type]+' · '+fname(e.fund)+' · '+aname(e.acc))+'</span><span class="num '+(e.type==='out'?'out':'in')+'">'+(e.type==='out'?'−':'+')+fmt(P(e.amt))+'</span></div>'}).join('')
+   +(es[0]?'<p class="help" style="margin-top:6px">'+fdate(es[0].date)+' · '+esc(es[0].person)+'</p>':'')
+   +(err?'<p class="err" role="alert">'+esc(err)+'</p>':'')
+   +'<div class="actions"><button class="btn danger" data-act="swapdel" data-grp="'+esc(grp)+'" data-confirm="1">Delete swap</button><button class="btn" data-act="close">Close</button></div></div>';
+  $('#layer').innerHTML=h;
+}
+function saveForm(again){
+  if(F.type==='swap')return saveSwap();
+  var t=F.type,money=t==='in'||t==='out'||t==='ret'||t==='move';
+  if(!F.date)return formErr('Pick a date.');
+  var fund=F.fund,toFund=F.toFund,nf=null,amt=0;
+  if(F.newFor&&F[F.newFor]==='__new'){
+    var nm=(F.newName||'').trim();
+    if(F.newKind==='event')nm=nm||eventName(F.newType,(F.newMember||'').trim());
+    if(!nm)return formErr('Give the new account or event a name.');
+    if(S.funds.some(function(x){return norm(x.name)===norm(nm)}))return formErr('That name already exists. Choose it from the list.');
+    nf=makeFund(nm,F.newKind,F.newType,F.newMember,F.date);
+    if(F.newFor==='fund')fund=nf.id;else toFund=nf.id;
+  }
+  if(fund==='__new'||toFund==='__new')return formErr('Give the new account or event a name.');
+  if(money){
+    amt=parseFloat(String(F.amt).replace(/,/g,''));if(!(amt>0))return formErr('Enter an amount greater than zero.');
+    if(t==='move'&&F.acc===F.toAcc&&fund===toFund)return formErr('Choose a different account or fund to move into.');
+    if((t==='out'||t==='ret')&&!(F.person||'').trim())return formErr(t==='out'?'Write who got the money.':'Write who is giving it back.');
+  }else if(!(F.name||'').trim())return formErr('Write what the item is.');
+  var id=F.editId||uid(),ca=F.createdAt||Date.now(),o=null;
+  if(money){
+    o={id:id,type:t,date:F.date,amt:Math.round(amt*100)/100,acc:F.acc,fund:fund,person:t==='move'?'':(F.person||'').trim(),note:(F.note||'').trim(),createdAt:ca};
+    if(t==='move'){o.toAcc=F.toAcc;o.toFund=toFund}
+    if(nf)S.funds.push(nf);
+    var err=validate(S.entries.filter(function(x){return x.id!==id}).concat([o]));
+    if(nf)S.funds.pop();
+    if(err)return formErr(err);
+  }
+  if(nf){put('funds',nf);if(nf.kind==='person')ensurePerson(nf.name,true);if(nf.kind==='event'&&nf.member)ensurePerson(nf.member,true)}
+  if(money){put('entries',o);lsSet('khata.lastAcc',F.acc)}
+  else put('items',{id:id,date:F.date,dir:t==='itemIn'?'in':'out',name:F.name.trim(),qty:(F.qty||'1').trim()||'1',person:(F.person||'').trim(),fund:fund||'',status:F.status,note:(F.note||'').trim(),createdAt:ca});
+  if(again){var keep=F.type;F=newF(keep,fund);sheetForm();render();toast('Saved')}
+  else{closeSheet();render();toast('Saved')}
+}
+function closeSheet(){$('#layer').innerHTML='';F=null}
+function toast(m){var t=document.createElement('div');t.className='toast';t.textContent=m;t.setAttribute('role','status');document.body.appendChild(t);setTimeout(function(){t.remove()},3200)}
+
+/* ---------- account / event / person forms ---------- */
+var G=null;
+function openFundForm(id,member){
+  var f=id?fundById(id):null;
+  G={kind:'fund',id:id||null,name:f?f.name:'',fk:f?f.kind:'event',etype:f&&f.etype||'Engagement',member:f&&f.member||member||'',date:f&&f.date||'',err:''};sheetSmall();
+}
+function openAccForm(id){var a=id?accById(id):null;G={kind:'acc',id:id||null,name:a?a.name:'',fk:a?a.kind:'bank',err:''};sheetSmall()}
+function openPersonForm(name){
+  var r=name?personRec(name):null;
+  G={kind:'person',id:name?'x':null,old:name||'',name:name||'',rel:r?r.rel:'',fam:name?isFamily(name):true,hold:!name,err:''};sheetSmall();
+}
+function sheetSmall(){
+  var k=G.kind,used=false;
+  if(G.id&&k!=='person')used=k==='fund'?(S.entries.some(function(e){return e.fund===G.id||e.toFund===G.id})||S.items.some(function(i){return i.fund===G.id})):S.entries.some(function(e){return e.acc===G.id||e.toAcc===G.id});
+  var title=k==='fund'?(G.id?'Edit':'New event'):k==='acc'?(G.id?'Edit account':'New account'):(G.old?'Edit person':'Add a family member');
+  var h='<div class="scrim" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true"><h3>'+title+'</h3>';
+  if(k==='fund'){
+    if(G.fk==='event')h+='<div class="two2"><label class="fld"><span>Event</span><select id="g_etype" data-g="etype">'+ETYPES.map(function(x){return '<option'+(G.etype===x?' selected':'')+'>'+x+'</option>'}).join('')+'</select></label>'
+      +'<label class="fld"><span>Date</span><input type="date" id="g_date" data-g="date" value="'+esc(G.date)+'"></label></div>'
+      +'<label class="fld"><span>Whose event</span><input id="g_member" data-g="member" list="people" autocomplete="off" value="'+esc(G.member)+'" placeholder="Family member"></label>';
+    h+='<label class="fld"><span>'+(G.fk==='event'?'Name (optional)':'Name')+'</span><input id="g_name" data-g="name" value="'+esc(G.name)+'" placeholder="'+(G.fk==='event'?'Made from the event and person if empty':'Name')+'"></label>';
+  }else if(k==='acc'){
+    h+='<label class="fld"><span>Name</span><input id="g_name" data-g="name" value="'+esc(G.name)+'" placeholder="e.g. UPI wallet"></label>'
+     +'<label class="fld"><span>Type</span><select id="g_fk" data-g="fk"><option value="bank"'+(G.fk==='bank'?' selected':'')+'>Bank, UPI or wallet</option><option value="cash"'+(G.fk==='cash'?' selected':'')+'>Cash in hand</option></select></label>';
+  }else{
+    h+='<label class="fld"><span>Name</span><input id="g_name" data-g="name" value="'+esc(G.name)+'" placeholder="Name"></label>'
+     +'<label class="fld"><span>Relation (optional)</span><input id="g_rel" data-g="rel" value="'+esc(G.rel)+'" placeholder="e.g. Mother, Brother, Aunt"></label>'
+     +'<label class="chk"><input type="checkbox" id="g_fam" data-g="fam"'+(G.fam?' checked':'')+'><span>Family member</span></label>'
+     +(G.old?'':'<label class="chk"><input type="checkbox" id="g_hold" data-g="hold"'+(G.hold?' checked':'')+'><span>Keep money with me for them</span></label>');
+  }
+  h+='<datalist id="people">'+allPeople().map(function(n){return '<option value="'+esc(n)+'">'}).join('')+'</datalist>';
+  if(G.err)h+='<p class="err" role="alert">'+esc(G.err)+'</p>';
+  var canRemove=k==='person'&&G.old&&!hasActivity(G.old);
+  var canDel=G.id&&k!=='person'&&!used&&(k==='fund'?G.id!=='own':S.accounts.length>1);
+  h+='<div class="actions"><button class="btn pri" data-act="gsave">Save</button>'+(canDel||canRemove?'<button class="btn danger" data-act="gdel" data-confirm="1">'+(canRemove?'Remove name':'Delete')+'</button>':'')+'<button class="btn" data-act="close">Cancel</button></div>'
+   +(G.id&&used&&k!=='person'?'<p class="help" style="margin-top:8px">It has entries, so it cannot be deleted.</p>':'')+'</div>';
+  $('#layer').innerHTML=h;
+}
+function saveSmall(){
+  var nm=(G.name||'').trim();
+  if(G.kind==='person'){
+    if(!nm){G.err='Write a name.';return sheetSmall()}
+    var merging=false;
+    if(norm(nm)!==norm(G.old)&&allPeople().some(function(n){return norm(n)===norm(nm)})){
+      if(!G.old){G.err='That name is already used.';return sheetSmall()}
+      if(personFund(G.old)&&personFund(nm)){G.err='Both names hold money for them, so they cannot be joined. Rename one of them instead.';return sheetSmall()}
+      if(G.mergeOk!==norm(nm)){G.mergeOk=norm(nm);G.err='“'+nm+'” already exists. Press Save again to join “'+G.old+'” into it. All entries move to “'+nm+'”.';return sheetSmall()}
+      merging=true;
+    }
+    var oldK=norm(G.old);
+    if(G.old&&G.old!==nm){
+      S.entries.forEach(function(e){if(norm(e.person)===oldK){e.person=nm;put('entries',e)}});
+      S.items.forEach(function(i){if(norm(i.person)===oldK){i.person=nm;put('items',i)}});
+      S.funds.forEach(function(f){var ch=false;
+        if(f.kind==='person'&&norm(f.name)===oldK){f.name=nm;ch=true}
+        if(f.kind==='event'&&norm(f.member)===oldK){if(f.name.indexOf(poss(G.old))===0)f.name=poss(nm)+f.name.slice(poss(G.old).length);f.member=nm;ch=true}
+        if(ch)put('funds',f)});
+    }
+    var r=G.old?personRec(G.old):null;
+    if(merging){var t=personRec(nm);if(r&&r!==t)del('people',r.id);
+      if(t){t.family=t.family||!!G.fam;if(!t.rel&&G.rel)t.rel=(G.rel||'').trim();put('people',t)}else put('people',{id:uid(),name:nm,rel:(G.rel||'').trim(),family:!!G.fam});
+      var w0=G.old;closeSheet();G=null;if(view==='member'||view==='person')arg=nm;render();toast('Joined');return}
+    if(r){r.name=nm;r.rel=(G.rel||'').trim();r.family=!!G.fam;put('people',r)}
+    else put('people',{id:uid(),name:nm,rel:(G.rel||'').trim(),family:!!G.fam});
+    if(!G.old&&G.hold&&!personFund(nm)&&!S.funds.some(function(f){return norm(f.name)===norm(nm)}))put('funds',makeFund(nm,'person'));
+    var wasOld=G.old;closeSheet();G=null;if(wasOld&&(view==='member'||view==='person'))arg=nm;render();toast('Saved');return;
+  }
+  var list=G.kind==='fund'?S.funds:S.accounts;
+  if(G.kind==='fund'&&G.fk==='event')nm=nm||eventName(G.etype,(G.member||'').trim());
+  if(!nm){G.err='Write a name.';return sheetSmall()}
+  if(list.some(function(x){return x.id!==G.id&&norm(x.name)===norm(nm)})){G.err='That name is already used.';return sheetSmall()}
+  if(G.id){var o=list.filter(function(x){return x.id===G.id})[0];o.name=nm;
+    if(G.kind==='acc')o.kind=G.fk;
+    if(G.kind==='fund'&&o.kind==='event'){o.etype=G.etype;o.member=(G.member||'').trim();o.date=G.date||''}
+    put(G.kind==='fund'?'funds':'accounts',o)}
+  else if(G.kind==='fund')put('funds',makeFund(nm,G.fk,G.etype,G.member,G.date));
+  else put('accounts',{id:uid(),name:nm,kind:G.fk,ord:Date.now()});
+  if(G.kind==='fund'&&G.fk==='event'&&G.member)ensurePerson(G.member,true);
+  closeSheet();G=null;render();toast('Saved');
+}
+
+/* ---------- reconcile ---------- */
+var R=null;
+function openRecon(id){R={id:id,actual:'',fund:'own',err:''};sheetRecon()}
+function sheetRecon(){
+  var C=compute(),a=accById(R.id),book=C.acc[R.id]||0;
+  var act=R.actual===''?null:P(R.actual),diff=act===null?null:act-book;
+  var h='<div class="scrim" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true"><h3>Check '+esc(a.name)+'</h3>'
+   +'<div class="kv"><span class="help">Khata says</span><span class="num" style="font-size:20px">'+fmt(book)+'</span></div>'
+   +'<label class="fld"><span>'+(a.kind==='cash'?'Cash you counted (₹)':'Balance shown by the bank (₹)')+'</span><input class="amt" id="r_actual" inputmode="decimal" autocomplete="off" value="'+esc(R.actual)+'" placeholder="0"></label>'
+   +'<div id="r_out">'+reconOut(diff)+'</div></div>';
+  $('#layer').innerHTML=h;
+}
+function reconOut(diff){
+  if(diff===null)return '<p class="help">Type the real amount to compare.</p>';
+  if(diff===0)return '<p class="pos" style="font-weight:600;margin:6px 0 10px">Matches. Nothing is missing.</p><div class="actions"><button class="btn pri" data-act="close">Done</button></div>';
+  return '<p style="margin:6px 0 10px"><b class="'+(diff>0?'pos':'neg')+'">'+(diff>0?'The real balance is '+fmt(diff)+' more':'The real balance is '+fmt(-diff)+' less')+'</b> than the khata. Look for an entry you forgot or typed wrongly. If you cannot find it, post an adjustment.</p>'
+   +'<label class="fld"><span>Put the difference on</span><select id="r_fund">'+S.funds.map(function(f){return '<option value="'+f.id+'"'+(R.fund===f.id?' selected':'')+'>'+esc(f.name)+'</option>'}).join('')+'</select></label>'
+   +(R.err?'<p class="err" role="alert">'+esc(R.err)+'</p>':'')+'<div class="actions"><button class="btn pri" data-act="radjust">Post adjustment</button><button class="btn" data-act="close">I will look for it</button></div>';
+}
+function postAdjust(){
+  var C=compute(),book=C.acc[R.id]||0,diff=P(R.actual)-book;if(!diff)return;
+  var adj={id:uid(),type:diff>0?'in':'out',date:today(),amt:Math.abs(diff)/100,acc:R.id,fund:R.fund,person:'Adjustment',note:'Adjustment after checking (real balance '+fmt(P(R.actual))+')',createdAt:Date.now()};
+  var err=validate(S.entries.concat([adj]));
+  if(err){R.err=err;return sheetRecon2()}
+  put('entries',adj);closeSheet();R=null;render();toast('Adjustment posted');
+}
+function sheetRecon2(){var keep=R;sheetRecon();$('#r_actual').value=keep.actual}
+
+/* ---------- backup, restore, export ---------- */
+function backupText(){return JSON.stringify(S,null,1)}
+async function saveFile(name,data){
+  var ext=name.split('.').pop().toLowerCase(),type=ext==='json'?'application/json':ext==='csv'?'text/csv':'text/plain';
+  var blob=new Blob([data],{type:type+';charset=utf-8'});
+  try{
+    var file=new File([blob],name,{type:type});
+    if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:name});return true}
+  }catch(e){if(e&&e.name==='AbortError')return false}
+  try{var url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url)},5000);return true}
+  catch(e){toast('Could not save the file. Use Copy backup text.');return false}
+}
+async function doBackup(){var ok=await saveFile('family-khata-backup-'+today()+'.json',backupText());if(ok){lsSet('khata.lastBackup',today());render();toast('Backup saved')}}
+function csvCell(v){v=String(v==null?'':v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}
+function csvText(rows){return '﻿'+rows.map(function(r){return r.map(csvCell).join(',')}).join('\n')}
+var KL={in:'Received',out:'Paid out',ret:'Returned back',move:'Move'};
+function entryCsvRow(e){return [e.date,KL[e.type],e.amt,aname(e.acc),fname(e.fund),effPerson(e),e.type==='move'?aname(e.toAcc)+' / '+fname(e.toFund):'','','',e.note||'']}
+var CSVH=['Date','Kind','Amount','Account','Fund or event','Person','Moved to','Item','Status','Note'];
+function itemCsvRow(i){return [i.date,i.dir==='in'?'Item received':'Item given','','',i.fund?fname(i.fund):'',i.person||'','',i.name+(i.qty&&i.qty!=='1'?' x'+i.qty:''),i.status==='done'?'Settled':'Pending',i.note||'']}
+function slug(s){return String(s).replace(/[^\w]+/g,'-')}
+async function doCsv(){
+  var rows=[CSVH];merged().slice().reverse().forEach(function(r){rows.push(r.k==='m'?entryCsvRow(r.o):itemCsvRow(r.o))});
+  await saveFile('family-khata-'+today()+'.csv',csvText(rows));
+}
+async function csvPerson(name){
+  var pc=personCtx(name),rows=[['Report for '+name],CSVH];
+  pc.ctx.forEach(function(c){c.rows.forEach(function(r){rows.push(r.k==='m'?entryCsvRow(r.o):itemCsvRow(r.o))})});
+  await saveFile('khata-'+slug(name)+'-'+today()+'.csv',csvText(rows));
+}
+async function csvFperson(fid,name){
+  var k=norm(name),rows=[['Ledger of '+name+' in '+fname(fid)],['Date','Kind','Amount','Account','Item','Note']];
+  S.entries.filter(function(e){return e.type!=='move'&&e.fund===fid&&norm(effPerson(e))===k}).sort(function(a,b){return a.date<b.date?-1:1}).forEach(function(e){rows.push([e.date,KL[e.type],e.amt,aname(e.acc),'',e.note||''])});
+  S.items.filter(function(i){return i.fund===fid&&norm(i.person)===k}).forEach(function(i){rows.push([i.date,i.dir==='in'?'Item received':'Item given','','',i.name,i.note||''])});
+  await saveFile('khata-'+slug(fname(fid))+'-'+slug(name)+'-'+today()+'.csv',csvText(rows));
+}
+async function csvFund(id){
+  var rows=[['Report for '+fname(id)],['Date','Kind','Amount','Account','Person','Balance after','Note']];
+  lines(id).forEach(function(l){var e=l.e;rows.push([e.date,KL[e.type]+(l.mv?' ('+l.mv+')':''),(l.d/100),aname(l.mv==='in'?e.toAcc:e.acc),effPerson(e),l.run/100,e.note||''])});
+  await saveFile('khata-'+slug(fname(id))+'-'+today()+'.csv',csvText(rows));
+}
+async function csvAcct(id){
+  var rows=[['Statement of '+aname(id)],['Date','Kind','Amount','Fund or event','Person','Balance after','Note']];
+  acctLines(id).forEach(function(l){var e=l.e;rows.push([e.date,KL[e.type]+(l.mv?' ('+l.mv+')':''),(l.d/100),fname(l.mv==='in'?e.toFund:e.fund),effPerson(e),l.run/100,e.note||''])});
+  await saveFile('khata-'+slug(aname(id))+'-'+today()+'.csv',csvText(rows));
+}
+function copyText(txt,ok){
+  function fb(){var ta=document.createElement('textarea');ta.value=txt;document.body.appendChild(ta);ta.select();var d=false;try{d=document.execCommand('copy')}catch(e){}ta.remove();toast(d?ok:'Could not copy')}
+  try{navigator.clipboard.writeText(txt).then(function(){toast(ok)},fb)}catch(e){fb()}
+}
+function parseBackup(t){var j;try{j=JSON.parse(t)}catch(e){return null}
+  if(!j||(j.v!==1&&j.v!==2)||!Array.isArray(j.accounts)||!Array.isArray(j.funds)||!Array.isArray(j.entries)||!Array.isArray(j.items))return null;
+  if(!j.accounts.length||!j.funds.length)return null;
+  var ids=true;COLS.forEach(function(c){(j[c]||[]).forEach(function(r){if(!r||typeof r.id!=='string'||!/^[A-Za-z0-9_.~:@+-]+$/.test(r.id))ids=false})});
+  if(!ids)return null;
+  return upgrade({v:2,accounts:j.accounts,funds:j.funds,people:j.people||[],entries:j.entries,items:j.items});
+}
+function doRestore(){
+  var f=$('#file'),p=$('#paste');
+  if(f&&f.files&&f.files[0]){var rd=new FileReader();rd.onload=function(){var j=parseBackup(String(rd.result));if(j)replaceAll(j,'Restoring');else toast('That file is not a Family Khata backup')};rd.readAsText(f.files[0]);return}
+  if(p&&p.value.trim()){var j=parseBackup(p.value.trim());if(j)replaceAll(j,'Restoring');else toast('That text is not a Family Khata backup');return}
+  toast('Choose a file or paste the backup text first');
+}
+
+/* ---------- example data ---------- */
+function sampleState(){
+  var s=blank(),n=0;
+  s.funds.push({id:'f_m',name:'Mother',kind:'person',ord:1},
+    {id:'f_e',name:'Brother’s Engagement',kind:'event',etype:'Engagement',member:'Brother',date:daysAgo(12),ord:2},
+    {id:'f_c',name:'Sister’s Child birth',kind:'event',etype:'Child birth',member:'Sister',date:daysAgo(20),ord:3});
+  s.people.push({id:'p1',name:'Mother',rel:'Mother',family:true},{id:'p2',name:'Sister',rel:'Sister',family:true},{id:'p3',name:'Brother',rel:'Brother',family:true},{id:'p4',name:'Father',rel:'Father',family:true});
+  function E(o){o.id='x'+(n++);o.createdAt=1000+n;s.entries.push(o)}
+  E({type:'in',date:daysAgo(40),amt:40000,acc:'bank',fund:'own',person:'',note:'Opening balance'});
+  E({type:'in',date:daysAgo(40),amt:6000,acc:'cash',fund:'own',person:'',note:'Opening balance'});
+  E({type:'in',date:daysAgo(30),amt:30000,acc:'bank',fund:'f_m',person:'',note:'Mother’s own money'});
+  E({type:'in',date:daysAgo(28),amt:15000,acc:'bank',fund:'f_m',person:'Father',note:'Sent as Mother asked'});
+  E({type:'out',date:daysAgo(22),amt:5000,acc:'bank',fund:'f_m',person:'Sister',note:'Mother asked to give Sister'});
+  E({type:'ret',date:daysAgo(9),amt:2000,acc:'cash',fund:'f_m',person:'Sister',note:'Sister paid back part'});
+  E({type:'out',date:daysAgo(7),amt:2000,acc:'cash',fund:'f_m',person:'Mother',note:'Cash given to Mother'});
+  E({type:'in',date:daysAgo(20),amt:5000,acc:'cash',fund:'f_c',person:'Father',note:'Welcome gift'});
+  E({type:'out',date:daysAgo(19),amt:1200,acc:'cash',fund:'f_c',person:'Hospital',note:'Sweets for staff'});
+  E({type:'in',date:daysAgo(11),amt:11000,acc:'cash',fund:'f_e',person:'Uncle',note:'Gift'});
+  E({type:'in',date:daysAgo(11),amt:21000,acc:'bank',fund:'f_e',person:'Aunt',note:'Gift'});
+  E({type:'out',date:daysAgo(8),amt:6500,acc:'cash',fund:'f_e',person:'Caterer',note:'Sweets and food'});
+  E({type:'out',date:daysAgo(5),amt:1500,acc:'cash',fund:'f_e',person:'Aunt',note:'Cash given back at the visit'});
+  E({type:'out',date:daysAgo(6),amt:3000,acc:'cash',fund:'own',person:'Sister',note:'Needed for shopping'});
+  E({type:'move',date:daysAgo(3),amt:3000,acc:'cash',fund:'own',toAcc:'bank',toFund:'own',person:'',note:'Cash deposited'});
+  function I(o){o.id='y'+(n++);o.createdAt=2000+n;s.items.push(o)}
+  I({date:daysAgo(11),dir:'in',name:'Gold ring',qty:'1',person:'Aunt',fund:'f_e',status:'done',note:''});
+  I({date:daysAgo(11),dir:'in',name:'Clothes set',qty:'3',person:'Uncle',fund:'f_e',status:'pending',note:'Return gift due'});
+  I({date:daysAgo(4),dir:'out',name:'Sweets box',qty:'4',person:'Aunt',fund:'f_e',status:'pending',note:'To be given when they visit'});
+  return s;
+}
+function startDemo(){if(demo)return;demo=true;S=sampleState();hist=[];view='home';render()}
+function exitDemo(){demo=false;if(mode==='sync')applyRemote();else S=loadLocal();hist=[];view='home';render()}
+
+/* ---------- events ---------- */
+var armed=null;
+function onClick(ev){
+  var el=ev.target.closest('[data-act]');if(!el)return;var a=el.dataset.act;
+  if(el.dataset.confirm){if(armed!==el){armed=el;var old=el.textContent;el.textContent='Tap again to confirm';setTimeout(function(){if(armed===el){armed=null;el.textContent=old}},4000);return}armed=null}
+  if(a==='tab')tab(el.dataset.v);
+  else if(a==='back')back();
+  else if(a==='add')openAdd('in',el.dataset.fund||null,el.dataset.person||'');
+  else if(a==='close'){closeSheet();G=null;R=null}
+  else if(a==='ftype'){var was=F.type;F.type=el.dataset.v;F.err='';if(F.type==='swap'&&was!=='swap')setSwapDefaults();sheetForm()}
+  else if(a==='swapdel'){
+    var g=el.dataset.grp,er=validate(S.entries.filter(function(x){return x.grp!==g}));
+    if(er)return sheetSwap(g,'This swap cannot be deleted yet. '+er);
+    S.entries.filter(function(x){return x.grp===g}).forEach(function(x){del('entries',x.id)});closeSheet();render();toast('Deleted')}
+  else if(a==='pickname'){F.person=el.dataset.name;var pi=$('#f_person');if(pi)pi.value=F.person}
+  else if(a==='fsave')saveForm(false);else if(a==='fsave2')saveForm(true);
+  else if(a==='fdel'){
+    var id=F.editId,err=validate(S.entries.filter(function(x){return x.id!==id}));
+    if(err)return formErr('This entry cannot be deleted yet. '+err);
+    del('entries',id);del('items',id);closeSheet();render();toast('Deleted')}
+  else if(a==='edit')openEdit(el.dataset.kind,el.dataset.id);
+  else if(a==='toggle'){var it=S.items.filter(function(x){return x.id===el.dataset.id})[0];if(it){it.status=it.status==='done'?'pending':'done';put('items',it);render()}}
+  else if(a==='fund')go('fund',el.dataset.id);
+  else if(a==='fperson')go('fperson',{fid:el.dataset.fid,name:el.dataset.name});
+  else if(a==='member')go('member',el.dataset.name);
+  else if(a==='acct')go('acct',el.dataset.id);
+  else if(a==='acctall'){acctAll=true;render()}
+  else if(a==='person')go('person',el.dataset.name);
+  else if(a==='newfund')openFundForm();
+  else if(a==='newevent')openFundForm(null,el.dataset.name);
+  else if(a==='editfund')openFundForm(el.dataset.id);
+  else if(a==='holdfund'){var nm=el.dataset.name;ensurePerson(nm,true);if(!personFund(nm))put('funds',makeFund(nm,'person'));render();toast('Done')}
+  else if(a==='newperson')openPersonForm();
+  else if(a==='editperson')openPersonForm(el.dataset.name);
+  else if(a==='newacc')openAccForm();else if(a==='editacc')openAccForm(el.dataset.id);
+  else if(a==='gsave')saveSmall();
+  else if(a==='gdel'&&G.kind==='person'){var pr=personRec(G.old);if(pr&&!hasActivity(G.old))del('people',pr.id);closeSheet();G=null;if(view==='member'||view==='person')back();else render()}
+  else if(a==='gdel'){var id2=G.id;if(G.kind==='fund')del('funds',id2);else del('accounts',id2);closeSheet();G=null;if(view==='fund')back();else render()}
+  else if(a==='flt'){flt=el.dataset.v;render()}
+  else if(a==='pending'){flt='pending';Q='';tab('entries')}
+  else if(a==='recon')openRecon(el.dataset.id);
+  else if(a==='radjust')postAdjust();
+  else if(a==='backup')doBackup();else if(a==='csv')doCsv();
+  else if(a==='csvperson')csvPerson(el.dataset.name);else if(a==='csvfperson')csvFperson(el.dataset.fid,el.dataset.name);
+  else if(a==='csvfund')csvFund(el.dataset.id);else if(a==='csvacct')csvAcct(el.dataset.id);
+  else if(a==='copybackup')copyText(backupText(),'Backup text copied');
+  else if(a==='restore')doRestore();
+  else if(a==='sample')startDemo();
+  else if(a==='exitdemo')exitDemo();
+  else if(a==='upload')mergeUpload();
+  else if(a==='dismissupload')dismissUpload();
+  else if(a==='sy_cfg')saveCfg();
+  else if(a==='sy_in')doSignIn(false);else if(a==='sy_new')doSignIn(true);
+  else if(a==='sy_out'){try{firebase.auth().signOut()}catch(e){}}
+  else if(a==='sy_copy')copyText(setupText(),'Setup text copied');
+  else if(a==='install'&&deferredPrompt){deferredPrompt.prompt();deferredPrompt=null;render()}
+  else if(a==='wipe'){replaceAll(blank(),'Erasing')}
+}
+function onInput(ev){
+  var t=ev.target;
+  if(t.id==='sy_cfg'){SY.cfg=t.value;return}
+  if(t.id==='sy_email'){SY.email=t.value;return}
+  if(t.id==='sy_pw'){SY.pw=t.value;return}
+  if(t.id==='q'){Q=t.value;listEntries();return}
+  if(t.id==='r_actual'){R.actual=t.value;R.err='';var C=compute(),book=C.acc[R.id]||0;$('#r_out').innerHTML=reconOut(t.value===''?null:P(t.value)-book);return}
+  if(t.id==='r_fund'){R.fund=t.value;return}
+  if(t.dataset.g&&G){G[t.dataset.g]=t.type==='checkbox'?t.checked:t.value;return}
+  var k=t.dataset.k;if(!k||!F)return;F[k]=t.value;
+  if(ev.type!=='change')return;
+  if(k==='fund'||k==='toFund'){
+    if(t.value==='__new'){F.newFor=k;sheetForm();var nn=$('#f_newName')||$('#f_newMember');if(nn)nn.focus()}
+    else{if(F.newFor===k)F.newFor=null;
+      if(F.type==='swap'&&k==='fund'){var ff=fundById(F.fund);if(ff&&ff.kind==='person'&&!F.person)F.person=ff.name;F.acc=bestAcc(F.fund);
+        if(F.acc===F.toAcc){var oa=S.accounts.filter(function(x){return x.id!==F.toAcc})[0];if(oa)F.acc=oa.id}}
+      sheetForm()}
+  }else if(k==='newKind')sheetForm();
+}
+function registerSW(){
+  if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1')){navigator.serviceWorker.register('sw.js').catch(function(){})}
+}
+function boot(){
+  S=loadLocal();
+  document.addEventListener('click',onClick);
+  document.addEventListener('input',onInput);
+  document.addEventListener('change',onInput);
+  window.addEventListener('online',function(){render()});window.addEventListener('offline',function(){render()});
+  window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();deferredPrompt=e;if(view==='more')render()});
+  window.addEventListener('appinstalled',function(){deferredPrompt=null;render()});
+  try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
+  render();
+  registerSW();
+  startSync();
+}
+if(typeof document!=='undefined'&&document.getElementById&&document.getElementById('app'))boot();
+</script>
+</body>
+</html>
